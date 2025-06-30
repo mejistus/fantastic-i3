@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# 定义 ANSI 转义序列
+ESC_SEQ="\033["
+
+# 定义文本样式
+BOLD_STYLE="1m"
+RESET_STYLE="0m"
+
+# 定义颜色代码
+RED_COLOR="31"
+GREEN_COLOR="32"
+YELLOW_COLOR="33"
+BLUE_COLOR="34"
+PURPLE_COLOR="35"
+# 输出彩色粗体文本函数
+print_colored_bold_text() {
+    local color=$1
+    shift
+    local text=$@
+
+  # 输出带有样式的文本
+  echo -e "${ESC_SEQ}${BOLD_STYLE}${ESC_SEQ}${color}m${text}${ESC_SEQ}${RESET_STYLE}"
+}
+
+egreen() {
+    local GREEN='\033[32m'
+    local RESET='\033[0m'
+    echo -e "${GREEN}$1${RESET}"
+    #    print_colored_bold_text $GREEN_COLOR $1
+}
+ered() {
+    #   local GREEN='\033[31m'
+    #   local RESET='\033[0m'
+    #   echo -e "${GREEN}$1${RESET}"
+    print_colored_bold_text $RED_COLOR $@
+}
+
+epurple() {
+    #   local GREEN='\033[35m'
+    #   local RESET='\033[0m'
+    #   echo -e "${GREEN}$1${RESET}"
+    print_colored_bold_text $PURPLE_COLOR $@
+}
+old_stty=$(stty -g)
+
+# 禁用终端的 CTRL-C 显示
+stty -echoctl
+
+# 存储初始目录状态
+initial_files=$(ls)
+
+cleanup(){
+    current_files=$(ls)
+    added_files=$(comm -23 <(echo "$current_files") <(echo "$initial_files"))
+    for file in $added_files; do
+        rm -rf "$file"
+    done
+}
+# 定义CTRL-C信号处理函数
+ctrl_c_handler() {
+    epurple ""
+    epurple "----------------Manual Ended----------------"
+    cleanup
+    stty "$old_stty"
+    exit 0
+}
+
+# 注册CTRL-C信号处理函数
+trap ctrl_c_handler SIGINT
+
+clear
+egreen "Welcome To Easy-Run !"
+if [ $# == 0 ];then
+    exit 0
+fi
+file=$1
+filename=${file%%.*}
+# 获取用户输入的文件名
+if [ ${file##*.} == "cpp" ]; then
+    CC="clang++ --std=c++17 -w"
+elif [ ${file##*.} == "c" ]; then
+    CC="clang --std=c17 -w"
+else
+    if [ ${file##*.} == "py" ]; then
+        CC="python3"
+        egreen "$CC $file"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $file
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "class" ];then
+        CC="java"
+        egreen "$CC $filename"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $filename
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "ts" ];then
+        CC="ts-node"
+        egreen "$CC $file"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $filename
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "js" ];then
+        CC="node"
+        egreen "$CC $file"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $filename
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "java" ];then
+        egreen "javac $file && java $filename"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        javac $file
+        java $filename
+        cleanup
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "go" ];then
+        CC="go run"
+        egreen "$CC $file"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $file
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    elif [ ${file##*.} == "swift" ];then
+        CC="swift"
+        egreen "$CC $file"
+        epurple ""
+        epurple "-------------Program Run Bellow-------------"
+        $CC $file
+        epurple ""
+        epurple "---------------Program Ended----------------"
+        exit 0
+    else
+        ered "Unknown Filetype , Only C/C++ Python Java Swift Go Source file Supported"
+    fi
+fi
+# C/C++
+egreen "$CC $file -o $filename"
+$CC $file -o $filename
+epurple ""
+# 判断编译是否成功
+if [ $? -eq 0 ]
+then
+    epurple "-------------Program Run Bellow-------------"
+    ./$filename
+    epurple ""
+    epurple "---------------Program Ended----------------"
+    cleanup
+else
+    ered "Compiled Wrongly!"
+fi
