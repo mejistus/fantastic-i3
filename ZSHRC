@@ -1,0 +1,40 @@
+alias vim=safe-edit
+alias rm=rmtrash
+alias ssh='env TERM=xterm-256color ssh' 
+alias trans='trans -x 127.0.0.1:7890'
+alias cat='bat -p -P'
+alias yyy='yay --noconfirm'
+alias rmr='/bin/rm'
+
+export PATH=$PATH:$HOME/.local/bin
+export PATH=$PATH:$HOME/.cargo/bin
+export GOPATH=$HOME/.local/share/go
+export GOPROXY=https://goproxy.cn,direct
+
+export FZF_DEFAULT_COMMAND='rg ~ --files --hidden'
+
+ccc() {
+  dir=$(fd --type=directory -H . /home/ /bin /etc/ /lib/ /opt/ /mnt/ /usr/ /var/ | fzf)
+  if [ -n "$dir" ]; then
+    cd "$dir"
+    print -s "cd $dir"
+  fi
+}
+
+vvv() {
+  file=$(fd --type=file -H . /home/ /etc/ /var/ /usr/ | fzf)
+  if [ -n "$file" ]; then
+    safe-edit "$file"
+    print -s "vim $file"
+  else
+    echo "No file selected."
+  fi
+}
+
+hhh() {
+  cmd=$(history 1 | sed 's/ *[0-9]* *//' | awk '!seen[$0]++' | fzf)
+  if [ -n "$cmd" ]; then
+    print -s "$cmd"
+    eval "$cmd"
+  fi
+}

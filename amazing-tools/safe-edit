@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# 检查是否提供了文件参数
+if [ "$#" -ne 1 ]; then
+    "$EDITOR"
+    exit 0
+fi
+
+file="$1"
+
+if [ ! -e "$file" ]; then
+    "$EDITOR" "$file"
+    exit 0
+fi
+# 检查文件是否可写
+if [ -w "$file" ]; then
+    # 用户有写权限，使用 $EDITOR
+    if [ -z "$EDITOR" ]; then
+        echo "Warning: \$EDITOR not set. Falling back to 'vim'."
+        EDITOR="vim"
+    fi
+    "$EDITOR" "$file"
+else
+    # 用户无写权限，使用 sudoedit
+    sudoedit "$file"
+fi
+
+# 世界和平

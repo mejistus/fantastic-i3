@@ -1,0 +1,3 @@
+#!/bin/sh
+# 向 qutebrowser 发送 JavaScript 代码
+echo 'jseval --quiet document.activeElement.blur()' >> "$QUTE_FIFO"
