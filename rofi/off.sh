@@ -19,12 +19,27 @@ texts[shutdown]="shutdown"
 
 declare -A icons
 # icons[lockscreen]="\uf023"
-icons[reboot]="😢"
-icons[logout]="😅"
-icons[suspend]="😄"
-icons[hibernate]="😰"
-icons[shutdown]="😭"
-icons[cancel]="😆"
+# icons[reboot]="😢"
+# icons[logout]="😅"
+# icons[suspend]="😄"
+# icons[hibernate]="😰"
+# icons[shutdown]="😭"
+# icons[cancel]="😆"
+#
+icons[reboot]="↺"
+icons[logout]="↪"
+icons[suspend]="☾"
+icons[hibernate]="◌"
+icons[shutdown]="⌁"
+icons[cancel]="✕"
+
+# Alternative minimal ASCII version:
+# icons[reboot]="R"
+# icons[logout]="L"
+# icons[suspend]="Z"
+# icons[hibernate]="H"
+# icons[shutdown]="P"
+# icons[cancel]="X"
 
 declare -A actions
 #actions[lockscreen]="sh $HOME/.config/sway/swaylock.sh"
