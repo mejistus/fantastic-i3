@@ -57,7 +57,7 @@ local bold_groups = {
 
     '@keyword.def', '@keyword.class', '@keyword.import', '@keyword.import_from',
     '@keyword.require', '@keyword.from', '@keyword.as', '@keyword.as_from',
-    '@keyword.return', '@keyword.function',
+    '@keyword.return', '@keyword.function','@keyword.conditional',
 
 
     '@function.call', '@function.method.call',
