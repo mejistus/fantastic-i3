@@ -40,7 +40,7 @@ return {
                 "optwin",
                 "compiler",
                 "bugreport",
-                "friendly-snippets",
+                -- "friendly-snippets",
             },
         },
     },

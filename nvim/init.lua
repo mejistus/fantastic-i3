@@ -2,6 +2,7 @@ vim.g.python3_host_prog = vim.fn.expand("$HOME") .. "/.virtualenvs/neovim/bin/py
 
 vim.g.base46_cache = vim.fn.stdpath "data" .. "/nvchad/base46/"
 -- vim.g.mapleader = " "
+--
 os.execute("export SSL_CERT_DIR=/etc/ssl/certs")
 
 -- bootstrap lazy and all plugins
@@ -26,7 +27,7 @@ lazy.setup({
     },
     {
         "vhyrro/luarocks.nvim",
-        priority = 1001,
+        priority = 1001, -- 该插件需要在其他插件之前加载
         opts = {
             rocks = { "magick" },
         },
@@ -49,34 +50,68 @@ dofile(vim.g.base46_cache .. "defaults")
 -- Code Bold
 ------------------------------------------------
 local bold_groups = {
-    '@keyword', '@keyword.function', '@keyword.return', '@keyword.operator',
-    '@conditional', '@repeat', '@exception', '@type', '@type.builtin',
-    '@storageclass', '@structure', '@function', '@constructor',
+    '@keyword', '@keyword.operator',
+    '@conditional', '@repeat', '@exception', '@type.builtin',
+    '@storageclass', '@structure', '@constructor',
     '@constant.builtin', '@variable.builtin', '@tag',
 
-    '@keyword.def', '@keyword.class', '@keyword.import',
+    '@keyword.def', '@keyword.class', '@keyword.import', '@keyword.import_from',
+    '@keyword.require', '@keyword.from', '@keyword.as', '@keyword.as_from',
+    '@keyword.return', '@keyword.function',
 
-    '@field', '@property', '@attribute', '@variable',
-    '@variable.parameter', '@variable.builtin', '@variable.member',
-    '@module', '@namespace',
+
+    '@function.call', '@function.method.call',
+
+    '@field', '@property', '@attribute',
+    '@variable.builtin',
 }
+local italic_groups = {
+    '@variable.parameter','@comment','@string.documentation'
+}
+local function set_bold_only(group)
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
+    if ok and hl then
+        -- 取消 link
+        vim.api.nvim_set_hl(0, group, {})
+        -- 显式设置 bold + 继承原属性（fg/bg/italic 等）
+        vim.api.nvim_set_hl(0, group, vim.tbl_extend("force", hl, { bold = true }))
+    else
+        vim.api.nvim_set_hl(0, group, { bold = true })
+    end
+end
+local function set_italic_only(group)
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
+    if ok and hl then
+        -- 取消 link
+        vim.api.nvim_set_hl(0, group, {})
+        -- 显式设置 bold + 继承原属性（fg/bg/italic 等）
+        vim.api.nvim_set_hl(0, group, vim.tbl_extend("force", hl, { italic = true }))
+    else
+        vim.api.nvim_set_hl(0, group, { italic = true })
+    end
+end
+
 
 local function enhance_syntax_highlighting()
     for _, group in ipairs(bold_groups) do
-        vim.api.nvim_set_hl(0, group, { bold = true })
+        set_bold_only(group)
     end
-    vim.api.nvim_set_hl(0, 'Operator', { fg = '#abb2bf', bold = true })
-    vim.api.nvim_set_hl(0, '@operator', { link = 'Operator' })
+    for _, group in ipairs(italic_groups) do
+        set_italic_only(group)
+    end
 end
 
-enhance_syntax_highlighting()
-
-vim.api.nvim_create_autocmd('ColorScheme', {
-    pattern = '*',
-    callback = enhance_syntax_highlighting
+-- 主题更换时重新执行
+vim.api.nvim_create_autocmd("ColorScheme", {
+    pattern = "*",
+    callback = function()
+        vim.defer_fn(enhance_syntax_highlighting, 50)
+    end,
 })
+
 -----------------------------------------------------------
 dofile(vim.g.base46_cache .. "statusline")
+-- 立即执行一次
 require "nvchad.autocmds"
 
 local cmp = require("cmp")
@@ -85,19 +120,19 @@ cmp.setup({
 
     completion = {
         autocomplete = { require('cmp.types').cmp.TriggerEvent.TextChanged },
-        keyword_length = 1,
-        debounce = 750,
+        keyword_length = 1, -- 输入几个字符后才开始补全
+        debounce = 750,     -- 触发补全的最小间隔，单位为毫秒
     },
 
     mapping = {
         ["<C-b>"] = cmp.mapping.scroll_docs(-4),
         ["<C-f>"] = cmp.mapping.scroll_docs(4),
         -- ["<C-Space>"] = cmp.mapping.complete(),
-        ["<CR>"] = cmp.mapping.confirm({ select = true }),
-        ["<Up>"] = cmp.mapping.select_prev_item(),
-        ["<Down>"] = cmp.mapping.select_next_item(),
-        ["<Tab>"] = nil,
-        ["<S-Tab>"] = nil,
+        ["<CR>"] = cmp.mapping.confirm({ select = true }), -- 确认选择
+        ["<Up>"] = cmp.mapping.select_prev_item(),         -- 上箭头选择上一个
+        ["<Down>"] = cmp.mapping.select_next_item(),       -- 下箭头选择下一个
+        ["<Tab>"] = nil,                                   -- 禁用 Tab 键导航（可选）
+        ["<S-Tab>"] = nil,                                 -- 禁用 Shift-Tab 键导航（可选）
     },
 })
 vim.schedule(function() require "mappings" end)
@@ -152,7 +187,7 @@ vim.g.vimtex_compiler_latexmk = {
     hooks = {},
     options = {
         '-verbose', '-file-line-error', '-shell-escape', '-synctex=1', '-interaction=nonstopmode',
-        -- '-aux-directory=build'
+        -- '-aux-directory=build' -- 仅中间文件输出到 build 目录
     },
 }
 
@@ -288,7 +323,7 @@ vim.keymap.set('n', 'zR', require('ufo').openAllFolds)
 vim.keymap.set('n', 'zM', require('ufo').closeAllFolds)
 vim.keymap.set('n', 'zr', require('ufo').openFoldsExceptKinds)
 vim.keymap.set('n', 'zm', require('ufo').closeFoldsWith) -- closeAllFolds == closeFoldsWith(0)
-vim.keymap.set('n', 'K', function()
+vim.keymap.set('n', 'F', function()
     local winid = require('ufo').peekFoldedLinesUnderCursor()
     if not winid then
         -- choose one of coc.nvim and nvim lsp
@@ -467,6 +502,118 @@ require('im_select').setup({
     async_switch_im         = true
 })
 
+
+-- 覆盖 preview 动作（必须在 setup() 之前做）
+local oil = require("oil")
+local util = require("oil.util")
+
+local function is_image(path)
+    local ext = path:match("^.+(%..+)$")
+    local image_exts = {
+        [".png"] = true,
+        [".jpg"] = true,
+        [".jpeg"] = true,
+        [".webp"] = true,
+        [".bmp"] = true,
+        [".gif"] = true,
+    }
+    return ext and image_exts[ext:lower()]
+end
+
+local function open_image_preview(path, entry, opts)
+    local split = opts.split or "botright"
+    local cmd = (opts.vertical and split .. " vsplit")
+        or (opts.horizontal and split .. " split")
+        or (split .. " vsplit")
+
+    -- 在当前窗口右侧创建分屏（不抢焦点）
+    vim.cmd(cmd)
+    local preview_win = vim.api.nvim_get_current_win()
+
+    -- 切回 oil 窗口（保持文件管理器处于活动窗口）
+    vim.cmd("wincmd p")
+
+    -- 创建 buffer + 绑定
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(preview_win, buf)
+    vim.fn.termopen({ "chafa", path })
+
+    -- 配置 buffer
+    vim.bo[buf].buftype = "terminal"
+    vim.bo[buf].bufhidden = "wipe"
+    vim.bo[buf].swapfile = false
+    vim.api.nvim_buf_set_name(buf, "preview://" .. entry.name)
+    vim.w[preview_win].oil_preview = true
+    vim.w[preview_win].oil_entry_id = entry.id
+    vim.w.oil_preview = true
+    vim.w.oil_entry_id = entry.id
+end
+
+require("oil.actions").preview = {
+    desc = "Use chafa to preview images; fallback to default preview for others",
+    parameters = {
+        vertical = { type = "boolean", desc = "Open in vertical split" },
+        horizontal = { type = "boolean", desc = "Open in horizontal split" },
+        split = {
+            type = '"aboveleft"|"belowright"|"topleft"|"botright"',
+            desc = "Split modifier",
+        },
+    },
+    callback = function(opts)
+        opts = opts or {}
+        local entry = oil.get_cursor_entry()
+        if not entry then
+            vim.notify("No entry under cursor", vim.log.levels.ERROR)
+            return
+        end
+
+        local util = require("oil.util")
+        local winid = util.get_preview_win()
+        if winid and vim.w[winid].oil_entry_id == entry.id then
+            vim.api.nvim_win_close(winid, true)
+            return
+        end
+
+        local path = oil.get_current_dir() .. "/" .. entry.name
+        local ext = path:match("^.+(%..+)$")
+        local image_exts = {
+            [".png"] = true,
+            [".jpg"] = true,
+            [".jpeg"] = true,
+            [".webp"] = true,
+            [".bmp"] = true,
+            [".gif"] = true,
+        }
+
+        if entry.type == "file" and ext and image_exts[ext:lower()] then
+            -- 正确打开并保持焦点在 oil buffer
+            local split = opts.split or "botright"
+            local cmd = (opts.vertical and split .. " vsplit")
+                or (opts.horizontal and split .. " split")
+                or (split .. " vsplit")
+
+            vim.cmd(cmd)
+            local preview_win = vim.api.nvim_get_current_win()
+            vim.cmd("wincmd p") -- ← 回到 oil buffer 保持焦点
+
+            local buf = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_win_set_buf(preview_win, buf)
+            vim.fn.termopen({ "chafa", path })
+
+            vim.bo[buf].buftype = "terminal"
+            vim.bo[buf].buftype = "terminal"
+            vim.bo[buf].bufhidden = "wipe"
+            vim.bo[buf].swapfile = false
+            vim.api.nvim_buf_set_name(buf, "preview://" .. entry.name)
+            vim.w[preview_win].oil_preview = true
+            vim.w[preview_win].oil_entry_id = entry.id
+        else
+            oil.open_preview(opts)
+        end
+    end
+
+}
+
 require("oil").setup({
     -- Oil will take over directory buffers (e.g. `vim .` or `:e src/`)
     -- Set to false if you want some other plugin (e.g. netrw) to open when you edit directories.
@@ -530,16 +677,11 @@ require("oil").setup({
     keymaps = {
         ["g?"] = { "actions.show_help", mode = "n" },
         ["<CR>"] = "actions.select",
+        ["l"] = "actions.select",
         ["<C-s>"] = { "actions.select", opts = { vertical = true } },
         ["<C-h>"] = { "actions.select", opts = { horizontal = true } },
         ["<C-t>"] = { "actions.select", opts = { tab = true } },
         ["<C-p>"] = "actions.preview",
-        -- ["<C-p>"] = {
-        --     callback = preview_image_action,
-        --     desc = "Preview image",
-        --     mode = "n"
-        -- },
-        ["<C-c>"] = { "actions.close", mode = "n" },
         ["<C-l>"] = "actions.refresh",
         ["h"] = { "actions.parent", mode = "n" },
         ["_"] = { "actions.open_cwd", mode = "n" },
@@ -679,7 +821,7 @@ require("oil").setup({
 
 -- lua, default settings
 require("better_escape").setup {
-    timeout = 250,           -- after `timeout` passes, you can press the escape key and the plugin will ignore it
+    timeout = 200,           -- after `timeout` passes, you can press the escape key and the plugin will ignore it
     default_mappings = true, -- setting this to false removes all the default mappings
     mappings = {
         -- i for insert
@@ -744,3 +886,38 @@ vim.keymap.set("n", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("v", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("n", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 vim.keymap.set("v", "<S-j>", "<C-d>", { desc = "scroll down half page" })
+
+require('fine-cmdline').setup({
+    cmdline = {
+        enable_keymaps = true,
+        smart_history = true,
+        prompt = '> '
+    },
+    popup = {
+        position = {
+            row = '50%',
+            col = '50%',
+        },
+        size = {
+            width = '60%',
+        },
+        border = {
+            style = 'rounded',
+        },
+        win_options = {
+            winhighlight = 'Normal:Normal,FloatBorder:FloatBorder',
+        },
+    },
+    hooks = {
+        before_mount = function(input)
+            -- code
+        end,
+        after_mount = function(input)
+        end,
+        set_keymaps = function(imap, feedkeys)
+            -- code
+        end
+    }
+})
+
+enhance_syntax_highlighting()

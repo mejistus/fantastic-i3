@@ -140,5 +140,13 @@ return {
     {
         "karb94/neoscroll.nvim",
         opts = {},
-    }
+    },
+    {
+        'VonHeikemen/fine-cmdline.nvim',
+        dependencies = {
+            'MunifTanjim/nui.nvim'
+        },
+        config = function()
+        end
+    },
 }

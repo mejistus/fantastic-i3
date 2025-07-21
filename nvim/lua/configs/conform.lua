@@ -1,9 +1,9 @@
 local options = {
     formatters_by_ft = {
-        lua = { "lua-formatter" },
+        lua = { "luaformatter" },
         css = { "prettier" },
         html = { "prettier" },
-        python = { "autopep8,prettier" },
+        python = { "black" },
         javascript = { "prettier" },
         typescript = { "prettier" },
         cpp = { "clang-format" },

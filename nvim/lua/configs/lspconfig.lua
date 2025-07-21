@@ -30,13 +30,19 @@ lspconfig.pyright.setup {
     on_attach = on_attach,
     capabilities = capabilities,
     settings = {
+        -- python = {
+        --     pythonPath = "~/.virtualenvs/aigc_detection/bin/python",
+        -- },
         analysis = {
             autoSearchPaths = true,
             diagnosticMode = "workspace",
             -- diagnosticMode = "openFilesOnly",
-            typeCheckingMode = "off", -- 关闭类型检查（按需开启）
-            -- useLibraryCodeForTypes =false,
+            -- typeCheckingMode = "off", -- 关闭类型检查（按需开启）
+            useLibraryCodeForTypes =true,
             -- exclude = { "**/venv", "**/.venv", "**/__pycache__" },
+            extraPaths = {
+                "~/.virtualenvs/aigc_detection/lib/python3.12/site-packages"
+            },
 
         },
         cmd_env = {
