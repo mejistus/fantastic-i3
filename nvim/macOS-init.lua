@@ -772,7 +772,7 @@ require("transparent").setup({
     groups = {
         'Normal', 'NormalNC', 'Comment', 'Constant', 'Special', 'Identifier',
         'Statement', 'PreProc', 'Type', 'Underlined', 'Todo', 'String', 'Function',
-        'Conditional', 'Repeat', 'Operator', 'Structure', 'LineNr', 'NonText',
+        'Conditional', 'Repeat', 'Operator', 'Structure', 'NonText',
         'SignColumn', 'CursorLine', 'CursorLineNr', 'StatusLine', 'StatusLineNC',
         'EndOfBuffer', "Folded" },
     extra_groups = {
@@ -790,11 +790,21 @@ require("transparent").setup({
         "UfoCursorFoldedLine", "UfoFoldedEllipsis", "UfoPreviewThumb", "UfoPreviewSbar",
         "LazyButton", "@markup.quote",
         "NvDashButtons", "NvDashAscii", "NvDashFooter",
-        "@ibl.scope",
+        "@ibl.scope.underline.1",
+        "@ibl.scope.underline.2",
+        "@ibl.scope.underline.3",
+        "@ibl.scope.underline.4",
+        "@ibl.scope.underline.5",
+        "@ibl.scope.underline.6",
+        "@ibl.scope.underline.7",
+        "@ibl.scope.char.1",
+        "@ibl.intent.char.1",
+        "@ibl.whitespace.char.1",
         "TelescopePreviewNormal", "TelescopePreviewMessage", "TelescopePreviewMessageFillchar",
         "TelescopePromptPrefix", "TelescopeMatching", "TelescopeTitle", "TelescopeBorder",
         "TelescopeResultsTitle", "TelescopeNormal", "TelescopePreviewBorder", "TelescopeResultsBorder",
-        "TelescopePromptBorder", "TelescopePromptNormal", "TelescopeResultsNormal", "TelescopeSelection",
+        "TelescopePromptBorder", "TelescopePromptNormal", "TelescopeResultsNormal", 
+        "TelescopeSelection",
         "TelescopeSelectionCaret",
         "TabLine", "TabLineFill",
         "TbTabOn", "TbThemeToggleBtn",
@@ -823,5 +833,6 @@ vim.keymap.set("n", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("v", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("n", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 vim.keymap.set("v", "<S-j>", "<C-d>", { desc = "scroll down half page" })
+
 
 enhance_syntax_highlighting()
