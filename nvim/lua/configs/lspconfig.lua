@@ -14,7 +14,7 @@ local capabilities = require("nvchad.configs.lspconfig").capabilities
 local lspconfig = require "lspconfig"
 local servers = { "html", "cssls", "pyright",
     "clangd", "cmake", "cssls", "html", "ts_ls",
-    "texlab", "bashls", "jsonls" }
+    "texlab", "bashls", "jsonls" ,"arduino_language_server"}
 
 -- lsps with default config
 for _, lsp in ipairs(servers) do
@@ -26,27 +26,30 @@ for _, lsp in ipairs(servers) do
 end
 
 
-lspconfig.pyright.setup {
+require("lspconfig").pyright.setup {
     on_attach = on_attach,
     capabilities = capabilities,
     settings = {
-        -- python = {
-        --     pythonPath = "~/.virtualenvs/aigc_detection/bin/python",
-        -- },
-        analysis = {
-            autoSearchPaths = true,
-            diagnosticMode = "workspace",
-            -- diagnosticMode = "openFilesOnly",
-            -- typeCheckingMode = "off", -- 关闭类型检查（按需开启）
-            useLibraryCodeForTypes =true,
-            -- exclude = { "**/venv", "**/.venv", "**/__pycache__" },
-            extraPaths = {
-                "~/.virtualenvs/aigc_detection/lib/python3.12/site-packages"
+        python = { -- ← 这一层不能少
+            analysis = {
+                autoSearchPaths = true,
+                diagnosticMode = "workspace",
+                diagnosticSeverityOverrides = {
+                    reportAttributeAccessIssue         = "warning",
+                    reportIncompatibleMethodUsage      = "information",
+                    reportIncompatibleVariableUsage    = "information",
+                    reportOptionalSubscript            = "none",
+                    reportOptionalUnnecessary          = "information",
+                    reportOptionalUnspecified          = "warning",
+                    reportUnnecessaryTypeIgnoreComment = "none",
+                    reportAssignmentType = "information",
+                    reportArgumentType = 'warning',
+                    reportCallIssue = "warning",
+                    reportOperatorIssue = "warning",
+                    reportPrivateImportUsage = "information"
+                },
             },
-
         },
-        cmd_env = {
-            NODE_OPTIONS = "--max-old-space-size=4096"
-        }
-    }
+    },
+    cmd_env = { NODE_OPTIONS = "--max-old-space-size=6000" },
 }

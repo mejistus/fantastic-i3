@@ -264,8 +264,6 @@ map('n', '<Leader>ds', [[<cmd>lua local widgets = require('dap.ui.widgets'); wid
 
 map('n', '<Leader>ldf', [[<cmd>Telescope lsp_definitions<CR>]],
     { noremap = true, silent = true, desc = "Telescope lsp_definitions" })
-map('n', 'gd', [[<cmd>Telescope lsp_definitions<CR>]],
-    { noremap = true, silent = true, desc = "Telescope lsp_definitions" })
 map('n', '<Leader>lws', [[<cmd>Telescope lsp_dynamic_workspace_symbols<CR>]],
     { noremap = true, silent = true, desc = "Telescope lsp_dynamic_workspace_symbols" })
 map('n', '<Leader>lds', [[<cmd>Telescope lsp_document_symbols<CR>]],
@@ -310,3 +308,4 @@ end
 
 vim.keymap.set("n", "<space>dg", ToggleDiagnostics, { desc = "Toggle LSP diagnostics" })
 vim.keymap.set("n", "<space>f", [[<cmd>lua vim.diagnostic.open_float()<CR>]], { desc = "Toggle LSP diagnostics" })
+vim.keymap.set({ 'n', 'v' }, '<leader>ca', vim.lsp.buf.code_action, { desc = 'Code Action' })
