@@ -1,8 +1,7 @@
 vim.g.python3_host_prog = vim.fn.expand("$HOME") .. "/.virtualenvs/neovim/bin/python3"
 
-vim.g.base46_cache = vim.fn.stdpath "data" .. "/nvchad/base46/"
+vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
 -- vim.g.mapleader = " "
---
 os.execute("export SSL_CERT_DIR=/etc/ssl/certs")
 
 -- bootstrap lazy and all plugins
@@ -57,7 +56,7 @@ local bold_groups = {
 
     '@keyword.def', '@keyword.class', '@keyword.import', '@keyword.import_from',
     '@keyword.require', '@keyword.from', '@keyword.as', '@keyword.as_from',
-    '@keyword.return', '@keyword.function','@keyword.conditional',
+    '@keyword.return', '@keyword.function', "@keyword.conditional",
 
 
     '@function.call', '@function.method.call',
@@ -66,7 +65,7 @@ local bold_groups = {
     '@variable.builtin',
 }
 local italic_groups = {
-    '@variable.parameter','@comment','@string.documentation'
+    '@variable.parameter', '@comment', '@string.documentation'
 }
 local function set_bold_only(group)
     local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
@@ -319,85 +318,11 @@ local ftMap = {
     python = { 'indent' },
     git = ''
 }
-vim.keymap.set('n', 'zR', require('ufo').openAllFolds)
-vim.keymap.set('n', 'zM', require('ufo').closeAllFolds)
-vim.keymap.set('n', 'zr', require('ufo').openFoldsExceptKinds)
-vim.keymap.set('n', 'zm', require('ufo').closeFoldsWith) -- closeAllFolds == closeFoldsWith(0)
-vim.keymap.set('n', 'F', function()
-    local winid = require('ufo').peekFoldedLinesUnderCursor()
-    if not winid then
-        -- choose one of coc.nvim and nvim lsp
-        -- vim.fn.CocActionAsync('definitionHover') -- coc.nvim
-        vim.lsp.buf.hover()
-    end
-end)
 
-local handler = function(virtText, lnum, endLnum, width, truncate)
-    local newVirtText = {}
-    local suffix = (' 󰁂 %d '):format(endLnum - lnum)
-    local sufWidth = vim.fn.strdisplaywidth(suffix)
-    local targetWidth = width - sufWidth
-    local curWidth = 0
-    for _, chunk in ipairs(virtText) do
-        local chunkText = chunk[1]
-        local chunkWidth = vim.fn.strdisplaywidth(chunkText)
-        if targetWidth > curWidth + chunkWidth then
-            table.insert(newVirtText, chunk)
-        else
-            chunkText = truncate(chunkText, targetWidth - curWidth)
-            local hlGroup = chunk[2]
-            table.insert(newVirtText, { chunkText, hlGroup })
-            chunkWidth = vim.fn.strdisplaywidth(chunkText)
-            -- str width returned from truncate() may less than 2nd argument, need padding
-            if curWidth + chunkWidth < targetWidth then
-                suffix = suffix .. (' '):rep(targetWidth - curWidth - chunkWidth)
-            end
-            break
-        end
-        curWidth = curWidth + chunkWidth
-    end
-    table.insert(newVirtText, { suffix, 'MoreMsg' })
-    return newVirtText
-end
-
--- global handler
--- `handler` is the 2nd parameter of `setFoldVirtTextHandler`,
--- check out `./lua/ufo.lua` and search `setFoldVirtTextHandler` for detail.
-require('ufo').setup({
-    open_fold_hl_timeout = 150,
-    close_fold_kinds_for_ft = {
-        default = { 'imports', 'comment' },
-        json = { 'array' },
-        c = { 'comment', 'region' },
-        python = { 'comment', 'region', 'code' }
-    },
-    fold_virt_text_handler = handler,
-    preview = {
-        win_config = {
-            border = { '', '─', '', '', '', '─', '', '' },
-            winhighlight = 'Normal:Folded',
-            winblend = 0
-        },
-        mappings = {
-            scrollU = '<C-u>',
-            scrollD = '<C-d>',
-            jumpTop = '[',
-            jumpBot = ']'
-        }
-    },
-    provider_selector = function(bufnr, filetype, buftype)
-        -- if you prefer treesitter provider rather than lsp,
-        -- return ftMap[filetype] or {'treesitter', 'indent'}
-        return ftMap[filetype]
-        -- refer to ./doc/example.lua for detail
-    end
-})
 -- buffer scope handler
 -- will override global handler if it is existed
-local bufnr = vim.api.nvim_get_current_buf()
-require('ufo').setFoldVirtTextHandler(bufnr, handler)
 require("codeium").setup({
-    enable_cmp_source = false,
+    enable_cmp_source = true,
     virtual_text = {
         enabled = true,
         manual = false,
@@ -437,7 +362,6 @@ vim.notify = function(msg, log_level, opts)
     if msg:match("Codeium") then
         return
     end
-    -- 否则照常通知
     vim.api.nvim_echo({ { msg } }, true, {})
 end
 
@@ -480,7 +404,6 @@ require("nvim-treesitter.configs").setup({
     }
 })
 
-require('twilight').setup()
 
 
 require('nvim-window').setup({
@@ -507,47 +430,6 @@ require('im_select').setup({
 local oil = require("oil")
 local util = require("oil.util")
 
-local function is_image(path)
-    local ext = path:match("^.+(%..+)$")
-    local image_exts = {
-        [".png"] = true,
-        [".jpg"] = true,
-        [".jpeg"] = true,
-        [".webp"] = true,
-        [".bmp"] = true,
-        [".gif"] = true,
-    }
-    return ext and image_exts[ext:lower()]
-end
-
-local function open_image_preview(path, entry, opts)
-    local split = opts.split or "botright"
-    local cmd = (opts.vertical and split .. " vsplit")
-        or (opts.horizontal and split .. " split")
-        or (split .. " vsplit")
-
-    -- 在当前窗口右侧创建分屏（不抢焦点）
-    vim.cmd(cmd)
-    local preview_win = vim.api.nvim_get_current_win()
-
-    -- 切回 oil 窗口（保持文件管理器处于活动窗口）
-    vim.cmd("wincmd p")
-
-    -- 创建 buffer + 绑定
-    local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_win_set_buf(preview_win, buf)
-    vim.fn.termopen({ "chafa", path })
-
-    -- 配置 buffer
-    vim.bo[buf].buftype = "terminal"
-    vim.bo[buf].bufhidden = "wipe"
-    vim.bo[buf].swapfile = false
-    vim.api.nvim_buf_set_name(buf, "preview://" .. entry.name)
-    vim.w[preview_win].oil_preview = true
-    vim.w[preview_win].oil_entry_id = entry.id
-    vim.w.oil_preview = true
-    vim.w.oil_entry_id = entry.id
-end
 
 require("oil.actions").preview = {
     desc = "Use chafa to preview images; fallback to default preview for others",
@@ -882,42 +764,75 @@ require('neoscroll').setup({
     },
 })
 
+
+
+
+
+require("transparent").setup({
+    groups = {
+        'Normal', 'NormalNC', 'Comment', 'Constant', 'Special', 'Identifier',
+        'Statement', 'PreProc', 'Type', 'Underlined', 'Todo', 'String', 'Function',
+        'Conditional', 'Repeat', 'Operator', 'Structure', 'NonText',
+        'SignColumn', 'CursorLine', 'CursorLineNr', 'StatusLine', 'StatusLineNC',
+        'EndOfBuffer', "Folded" },
+    extra_groups = {
+        "CmpDoc", "CmpBorder", "CmpPmenu", "LspInfoBorder", "LspInfoWin", "LspInfoWinBorder",
+        "CmpItemKindCodeium", "CmpItemAbbr", "CmpItemAbbrMatch", "CmpItemAbbrMatchFuzzy", "DiffAdd",
+        "DiffChange", "DiffDelete", "DiffAdded", "DiffChangeDelete", "DiffModified", "DiffText", "DiffRemoved",
+        "ErrorMsg", "Pmenu", "PmenuSbar",
+        "NormalFloat", "CursorColumn", "ColorColumn", "QuickFixLine",
+        "LspInlayHint", "SnippetTabStop",
+        "StatusLine", "StatusLineNC", "St_gitIcons", "St_lspWarning",
+        "St_lspError", "St_file", "St_file_sep", "St_LspMsg",
+        "St_LspInfo", "St_LspHints", "St_Lsp", "St_EmptySpace", "St_ConfirmModeSep",
+        "St_ConfirmMode", "St_pos_text", "St_cwd_text",
+        "UfoFoldedBg", "UfoFoldedFg", "UfoPreviewWinBar", "UfoPreviewCursorLine",
+        "UfoCursorFoldedLine", "UfoFoldedEllipsis", "UfoPreviewThumb", "UfoPreviewSbar",
+        "LazyButton", "@markup.quote",
+        "NvDashButtons", "NvDashAscii", "NvDashFooter",
+        "@ibl.scope.underline.1",
+        "@ibl.scope.underline.2",
+        "@ibl.scope.underline.3",
+        "@ibl.scope.underline.4",
+        "@ibl.scope.underline.5",
+        "@ibl.scope.underline.6",
+        "@ibl.scope.underline.7",
+        "@ibl.scope.char.1",
+        "@ibl.intent.char.1",
+        "@ibl.whitespace.char.1",
+        "TelescopePreviewNormal", "TelescopePreviewMessage", "TelescopePreviewMessageFillchar",
+        "TelescopePromptPrefix", "TelescopeMatching", "TelescopeTitle", "TelescopeBorder",
+        "TelescopeResultsTitle", "TelescopeNormal", "TelescopePreviewBorder", "TelescopeResultsBorder",
+        "TelescopePromptBorder", "TelescopePromptNormal", "TelescopeResultsNormal", 
+        "TelescopeSelection",
+        "TelescopeSelectionCaret",
+        "TabLine", "TabLineFill",
+        "TbTabOn", "TbThemeToggleBtn",
+        "TbTabOff", "TbTabOn", "TbTabNewBtn", "TbTabCloseBtn",
+        "TbFill", "TbCloseAllBufsBtn",
+        "TbBufOn", "TbBufOff",
+        "TbBufOffClose", "TbBufOnClose", "TbBufOnModified", "TbBufOffModified",
+    },
+    exclude_groups = {
+        "Visual", "VisualNC",
+        "St_VisualMode", "St_VisualModeSep", "St_TerminalModeSep", "St_TerminalMode",
+        "St_SelectModeSep", "St_SelectMode", "St_ReplaceModeSep", "St_ReplaceMode",
+        "St_NormalModeSep", "St_NormalMode", "St_NTerminalModeSep", "St_NTerminalMode",
+        "St_CommandModeSep", "St_CommandMode", "St_InsertModeSep", "St_InsertMode",
+        "St_pos_icon", "St_pos_sep", "St_cwd_icon", "St_cwd_sep",
+
+    },
+    on_clear = function() end,
+})
+
+vim.keymap.set('n', 'F', function()
+    vim.lsp.buf.hover()
+end)
+
 vim.keymap.set("n", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("v", "<S-k>", "<C-u>", { desc = "scroll up half page" })
 vim.keymap.set("n", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 vim.keymap.set("v", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 
-require('fine-cmdline').setup({
-    cmdline = {
-        enable_keymaps = true,
-        smart_history = true,
-        prompt = '> '
-    },
-    popup = {
-        position = {
-            row = '50%',
-            col = '50%',
-        },
-        size = {
-            width = '60%',
-        },
-        border = {
-            style = 'rounded',
-        },
-        win_options = {
-            winhighlight = 'Normal:Normal,FloatBorder:FloatBorder',
-        },
-    },
-    hooks = {
-        before_mount = function(input)
-            -- code
-        end,
-        after_mount = function(input)
-        end,
-        set_keymaps = function(imap, feedkeys)
-            -- code
-        end
-    }
-})
 
 enhance_syntax_highlighting()
