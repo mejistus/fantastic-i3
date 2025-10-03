@@ -9,7 +9,7 @@ But it's just a suggestion, after all, I use Dracula for myself.
 
 And in this repo, conky is from [slate-conky-theme](https://github.com/CrispyKSP/slate-conky-theme "CrispyKSP").
 
-Respect for all these great open-source project.
+Respect for all these great open-source projects.
 
 ## Preview
 
