@@ -32,8 +32,8 @@ require("lspconfig").pyright.setup {
     settings = {
         python = { -- ← 这一层不能少
             analysis = {
-                autoSearchPaths = true,
-                diagnosticMode = "workspace",
+                -- autoSearchPaths = true,
+                -- diagnosticMode = "workspace",
                 diagnosticSeverityOverrides = {
                     reportAttributeAccessIssue         = "warning",
                     reportIncompatibleMethodUsage      = "information",
