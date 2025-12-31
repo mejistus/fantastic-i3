@@ -83,7 +83,7 @@ elif [ ${file##*.} == "c" ]; then
     CC="clang --std=c17 -w"
 else
     if [ ${file##*.} == "py" ]; then
-        CC="python3"
+        CC="/Users/sunrising/.virtualenvs/repl/.venv/bin/python"
         egreen "$CC $file"
         epurple ""
         epurple "-------------Program Run Bellow-------------"
