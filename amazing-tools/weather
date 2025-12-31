@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# 获取当前城市（如果未提供参数，则自动检测）
+if [ -n "$1" ]; then
+    city="$1"
+else
+    city=$(curl -s ipinfo.io/city)
+    city=${city:-Shanghai}  # 如果获取失败，默认使用上海
+fi
+
+# 获取天气信息
+echo "Fetching weather for: $city"
+curl -s "wttr.in/$city"

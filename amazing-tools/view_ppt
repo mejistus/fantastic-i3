@@ -1,0 +1,139 @@
+#!/bin/bash
+# 多线程终端PPT查看器
+
+# 检查参数
+if [ $# -eq 0 ]; then
+    echo "用法: $0 <ppt文件> [幻灯片编号]"
+    exit 1
+fi
+
+PPT_FILE="$1"
+SLIDE_NUM="${2:-1}" # 默认为第1页
+
+# 创建临时目录
+TMP_DIR=$(mktemp -d)
+
+# 获取CPU核心数
+CORES=$(nproc)
+echo "检测到 ${CORES} 个CPU核心，将使用多线程加速转换..."
+
+# 将PPT转换为PNG图片（使用多线程）
+echo "正在多线程转换PPT文件..."
+
+# 使用LibreOffice将PPT转换为PDF（单线程，这一步很快）
+soffice --headless --convert-to pdf --outdir "$TMP_DIR" "$PPT_FILE" >/dev/null 2>&1
+
+echo "已经完成PPT转换为PDF\n"
+
+# 获取生成的PDF文件
+PDF_FILE="${TMP_DIR}/$(basename "${PPT_FILE%.*}").pdf"
+
+# 检查转换是否成功
+if [ ! -f "$PDF_FILE" ]; then
+    echo "错误: PPT转换为PDF失败"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+# 使用Ghostscript将PDF转换为PNG（多线程处理）
+# 创建临时目录存放分页PNG
+PNG_DIR="${TMP_DIR}/png_pages"
+mkdir -p "$PNG_DIR"
+
+# 函数：处理单个页面
+convert_page() {
+    local page_num=$1
+    local output_file="${PNG_DIR}/slide_$(printf "%03d" $page_num).png"
+    gs -dFirstPage=$page_num -dLastPage=$page_num -dNOPAUSE -dBATCH \
+        -sDEVICE=png16m -r150 -sOutputFile="$output_file" "$PDF_FILE" >/dev/null 2>&1
+    echo "页面 $page_num 转换完成"
+}
+# 获取总页数
+TOTAL_PAGES=$(gs -q -dNODISPLAY -c "($PDF_FILE) (r) file runpdfbegin pdfpagecount = quit")
+
+# 导出函数以便在子shell中使用
+export -f convert_page
+export PDF_FILE PNG_DIR
+
+# 使用GNU parallel进行多线程转换
+if command -v parallel &>/dev/null; then
+    echo "使用GNU parallel进行多线程转换..."
+    seq 1 "$TOTAL_PAGES" | parallel -j "$CORES" convert_page {}
+else
+    echo "GNU parallel未安装，将使用单线程转换（建议安装parallel以获得更好性能）"
+    for ((i = 1; i <= TOTAL_PAGES; i++)); do
+        convert_page "$i"
+    done
+fi
+
+# 获取生成的图片文件
+IMG_FILES=("$PNG_DIR"/*.png)
+TOTAL_SLIDES=${#IMG_FILES[@]}
+
+# 按数字排序图片文件
+IFS=$'\n' IMG_FILES=($(sort <<<"${IMG_FILES[*]}"))
+unset IFS
+
+# 检查请求的幻灯片编号是否有效
+if [ "$SLIDE_NUM" -lt 1 ] || [ "$SLIDE_NUM" -gt "$TOTAL_SLIDES" ]; then
+    echo "错误: 幻灯片编号必须在1到$TOTAL_SLIDES之间"
+    rm -rf "$TMP_DIR"
+    exit 1
+fi
+
+clear
+# 显示幻灯片
+while true; do
+
+    # 显示当前幻灯片信息
+    echo "幻灯片: $SLIDE_NUM/$TOTAL_SLIDES (使用 ${CORES} 线程加速转换)"
+    echo "使用: n-下一页, p-上一页, g-跳转, q-退出"
+    echo "--------------------------------"
+
+    # 使用chafa显示图像
+    chafa -c full --color-space din99d --symbols all -s $(($(tput cols) - 10))x$(($(tput lines) - 10)) "${IMG_FILES[$((SLIDE_NUM - 1))]}"
+
+    # 读取用户输入
+    read -n 1 -s -r -p "> " INPUT
+    echo
+
+    case $INPUT in
+    n | N)
+        clear
+        if [ "$SLIDE_NUM" -lt "$TOTAL_SLIDES" ]; then
+            ((SLIDE_NUM++))
+        else
+            echo "已经是最后一页了"
+            sleep 0.5
+        fi
+        ;;
+    p | P)
+        clear
+        if [ "$SLIDE_NUM" -gt 1 ]; then
+            ((SLIDE_NUM--))
+        else
+            echo "已经是第一页了"
+            sleep 0.5
+        fi
+        ;;
+    g | G)
+        clear
+        read -p "输入要跳转的页码 (1-$TOTAL_SLIDES): " JUMP_NUM
+        if [[ "$JUMP_NUM" =~ ^[0-9]+$ ]] && [ "$JUMP_NUM" -ge 1 ] && [ "$JUMP_NUM" -le "$TOTAL_SLIDES" ]; then
+            SLIDE_NUM="$JUMP_NUM"
+        else
+            echo "无效的页码"
+            sleep 1
+        fi
+        ;;
+    q | Q)
+        break
+        ;;
+
+    *) ;;
+    esac
+done
+
+# 清理临时文件
+rm -rf "$TMP_DIR"
+echo "已退出PPT查看器"
