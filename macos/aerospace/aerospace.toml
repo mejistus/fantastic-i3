@@ -121,6 +121,9 @@ on-mode-changed = []
   osascript -e "tell application \"Safari\" to activate"
 ' ''']
     alt-t = 'workspace --auto-back-and-forth T'
+    alt-b = 'workspace --auto-back-and-forth B'
+    alt-c = 'workspace --auto-back-and-forth C'
+
     alt-h = 'focus left'
     alt-j = 'focus down'
     alt-k = 'focus up'
@@ -131,8 +134,7 @@ on-mode-changed = []
     alt-right = 'focus right'
 
     alt-f = 'fullscreen'
-    alt-shift-f = ['layout floating tiling']
-    alt-ctrl-c = 'reload-config'
+    alt-shift-f = ['layout floating tiling', 'exec-and-forget center-window']
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#move
     alt-shift-h = 'move left'
@@ -167,13 +169,16 @@ on-mode-changed = []
     alt-shift-8 = ['move-node-to-workspace 8' ,'workspace 8 ']
     alt-shift-9 = ['move-node-to-workspace 9' ,'workspace 9 ']
     alt-shift-0 = ['move-node-to-workspace 10','workspace 10']
+    alt-shift-c = ['move-node-to-workspace C','workspace C']
+    alt-shift-t = ['move-node-to-workspace T','workspace T']
+    alt-shift-b = ['move-node-to-workspace B','workspace B']
   
     # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
     alt-tab = 'workspace-back-and-forth'
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
     alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
     alt-r = 'mode resize'
-    alt-c = ['exec-and-forget center-window']
+    alt-ctrl-c = ['exec-and-forget center-window']
     # See: https://nikitabobko.github.io/AeroSpace/commands#mode
     ctrl-s = 'mode service'
     ctrl-l = ["workspace next"]
@@ -208,6 +213,7 @@ on-mode-changed = []
     down = 'resize height -50'
     right = 'resize width +50'
     enter = 'mode main'
+    esc = 'mode main'
     space = ['mode main']
 
 
@@ -276,11 +282,10 @@ on-mode-changed = []
     if.app-id = 'net.kovidgoyal.kitty'
     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
-# [[on-window-detected]]
-#     if.app-id = 'com.bilibili.bilibiliPC'
-#     if.window-title-regex-substring = '^(哔哩哔哩|bilibili)$'
-#     run = 'layout tiling'
-# #
-# [[on-window-detected]]
-#     if.app-id = 'com.bilibili.bilibiliPC'
-#     run = ['layout floating', 'move-node-to-workspace 5', 'workspace 5']
+[[on-window-detected]]
+    if.app-id = 'com.baidu.BaiduNetdisk-mac'
+    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.app-id = 'com.anthropic.claudefordesktop'
+    run = ['layout floating', 'move-node-to-workspace C', 'exec-and-forget center-window']
