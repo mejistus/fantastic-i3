@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# 只统计 formula，避免 cask 造成 brew --prefix 报错
+installed_packages=$(brew list --formula)
+
+# 计算目录大小（跟随符号链接，且静默错误）
+size_of() {
+  du -shL "$1" 2>/dev/null | cut -f1
+}
+
+# 遍历每个已安装的 formula，并获取其占用空间
+echo "===== Formulas ====="
+IFS=$'\n'
+for package in $installed_packages; do
+  # 使用 Cellar 中的真实安装路径
+  cellar_dir=$(brew --cellar "$package" 2>/dev/null)
+  # 如果目录不存在，跳过
+  [ -d "$cellar_dir" ] || continue
+
+  size=$(size_of "$cellar_dir")
+  printf "%s\t%s\n" "$size" "$package"
+done | sort -rh
+
+
+echo
+echo "===== Casks ====="
+
+installed_casks=$(brew list --cask)
+
+for cask in $installed_casks; do
+  # 一般 cask 安装在 Caskroom 下
+  cask_dir="/opt/homebrew/Caskroom/$cask"
+  [ -d "$cask_dir" ] || continue
+
+  size=$(size_of "$cask_dir")
+  printf "%s\t%s (cask)\n" "$size" "$cask"
+done | sort -rh
