@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+import argparse
+import time
+import torch
+
+# print("This script will allocate a specified amount of VRAM (default: 8GB).")
+
+default_ram = 8
+
+parser = argparse.ArgumentParser(
+    prog="VRAM Allocator",
+    description="This script attempts to allocate a specified amount of VRAM on an MPS (Metal Performance Shaders) device.",
+    epilog="Example usage: freemps -r 8 (to allocate 8GB of VRAM)",
+)
+
+parser.add_argument(
+    "-r",
+    "--ram",
+    type=int,
+    default=default_ram,
+    help=f"Amount of VRAM to allocate in GB (default: {default_ram}GB).",
+)
+
+args = parser.parse_args()
+
+print(f"Attempting to allocate {args.ram} GB of VRAM.")
+
+try:
+    device = torch.device("mps")
+    s = time.time()
+    a = torch.rand(
+        1, args.ram * 1024 * 1024 * 1024 // 4 // 2, dtype=torch.float32, device=device
+    )
+    b = torch.rand(
+        1, args.ram * 1024 * 1024 * 1024 // 4 // 2, dtype=torch.float32, device=device
+    )
+    e = time.time() 
+
+    print(f"Allocation successful. Time taken: {(e - s):.2f}s")
+except Exception as e:
+    print(f"Failed to allocate {args.ram} GB of VRAM. Error: {e}")
