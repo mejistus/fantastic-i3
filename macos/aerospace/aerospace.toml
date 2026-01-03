@@ -123,6 +123,7 @@ on-mode-changed = []
     alt-t = 'workspace --auto-back-and-forth T'
     alt-b = 'workspace --auto-back-and-forth B'
     alt-c = 'workspace --auto-back-and-forth C'
+    alt-z = 'workspace --auto-back-and-forth Z'
 
     alt-h = 'focus left'
     alt-j = 'focus down'
@@ -172,6 +173,7 @@ on-mode-changed = []
     alt-shift-c = ['move-node-to-workspace C','workspace C']
     alt-shift-t = ['move-node-to-workspace T','workspace T']
     alt-shift-b = ['move-node-to-workspace B','workspace B']
+    alt-shift-z = ['move-node-to-workspace Z','workspace Z']
   
     # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
     alt-tab = 'workspace-back-and-forth'
@@ -219,11 +221,11 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.microsoft.Outlook'
-    run = ['layout floating','exec-and-forget center-window'] 
+    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window'] 
 
 [[on-window-detected]]
     if.app-id = 'com.baidu.netdisk'
-    run = ['layout floating','exec-and-forget center-window']
+    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
 
 
 [[on-window-detected]]
@@ -289,3 +291,7 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-id = 'com.anthropic.claudefordesktop'
     run = ['layout floating', 'move-node-to-workspace C', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.window-title-regex-substring = '^(Cursor|Code|Trae)$'
+    run = ['layout floating', 'move-node-to-workspace Z', 'exec-and-forget center-window']
