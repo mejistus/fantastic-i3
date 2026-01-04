@@ -38,3 +38,43 @@ hhh() {
     eval "$cmd"
   fi
 }
+
+ask_stream_py() {
+  python3 -u - "$*" <<'PY'
+import sys, json, requests
+
+prompt = sys.argv[1]
+url = "http://localhost:11434/api/chat"
+
+payload = {
+    "model": "qwen2.5:7b",
+    "messages": [{"role": "user", "content": prompt}],
+    "stream": True
+}
+
+r = requests.post(url, json=payload, stream=True)
+
+buf = ""
+FLUSH_CHARS = 1        # ⭐ 调这个：8~20 都可以
+SOFT_PUNCT = ("，", "。", "；", ",", ".", ";", "\n")
+
+for line in r.iter_lines():
+    if not line:
+        continue
+    obj = json.loads(line.decode("utf-8"))
+    chunk = obj.get("message", {}).get("content")
+    if not chunk:
+        continue
+
+    buf += chunk
+
+    # 条件刷新
+    if len(buf) >= FLUSH_CHARS or chunk.endswith(SOFT_PUNCT):
+        print(buf, end="", flush=True)
+        buf = ""
+
+# 收尾
+if buf:
+    print(buf, end="", flush=True)
+PY
+}
