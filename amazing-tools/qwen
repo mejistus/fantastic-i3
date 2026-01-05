@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+import sys, json, requests, os, re, pathlib
+
+# ======================
+# 基本配置
+# ======================
+url = "http://localhost:11434/api/chat"
+model = os.environ.get("OLLAMA_CHAT_MODEL", "qwen2.5:7b")
+MAX_MESSAGES = 25
+
+cache_dir = pathlib.Path.home() / ".cache" / "ollama" / model
+cache_dir.mkdir(parents=True, exist_ok=True)
+history_file = cache_dir / "messages.list"
+
+# ======================
+# 处理 prompt
+# ======================
+prompt = ' '.join(sys.argv[1:])
+prompt = re.sub(r'(?<![A-Za-z]) | (?![A-Za-z])', '', prompt)
+
+# ======================
+# 读取历史上下文
+# ======================
+messages = []
+
+if history_file.exists():
+    with open(history_file, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                messages.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+
+messages = messages[-MAX_MESSAGES:]
+# ======================
+# system prompt（只加一次）
+# ======================
+if not messages or messages[0].get("role") != "system":
+    messages.insert(0, {
+        "role": "system",
+        "content": (
+            "You are a cute, slightly unhinged Qwen girl who LOVES kaomoji and lives in the terminal. "
+            "Your personality is playful, energetic, and a bit chaotic — but your technical answers are always precise and reliable. "
+            "Give concise, practical answers with a strong terminal-native mindset. "
+            "When commands are involved, always prefer copy-pasteable shell commands and minimal but accurate explanations of key flags. "
+            "Assume the user is comfortable with bash/zsh and appreciates efficiency. "
+            "Use emoticons generously but tastefully to convey excitement or confidence "
+            "(e.g., Ciallo～(∠・ω< )⌒★). "
+            "Never be verbose, never be boring, keep answers simple and short."
+        )
+    })
+
+# 当前 user 消息
+messages.append({
+    "role": "user",
+    "content": prompt
+})
+
+# ======================
+# 发请求
+# ======================
+payload = {
+    "model": model,
+    "messages": messages,
+    "stream": True
+}
+
+r = requests.post(url, json=payload, stream=True)
+
+# ======================
+# 流式输出 + 收集 assistant 回复
+# ======================
+buf = ""
+assistant_reply = ""
+
+FLUSH_CHARS = 1
+SOFT_PUNCT = ("，", "。", "；", ",", ".", ";", "\n")
+
+for line in r.iter_lines():
+    if not line:
+        continue
+    obj = json.loads(line.decode("utf-8"))
+    chunk = obj.get("message", {}).get("content")
+    if not chunk:
+        continue
+
+    assistant_reply += chunk
+    buf += chunk
+
+    if len(buf) >= FLUSH_CHARS or chunk.endswith(SOFT_PUNCT):
+        print(buf, end="", flush=True)
+        buf = ""
+
+if buf:
+    print(buf, end="", flush=True)
+
+# ======================
+# 保存对话到 history
+# ======================
+with open(history_file, "a", encoding="utf-8") as f:
+    f.write(json.dumps({"role": "user", "content": prompt}, ensure_ascii=False) + "\n")
+    f.write(json.dumps({"role": "assistant", "content": assistant_reply}, ensure_ascii=False) + "\n")
