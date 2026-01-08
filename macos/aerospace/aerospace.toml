@@ -124,6 +124,7 @@ on-mode-changed = []
     alt-b = 'workspace --auto-back-and-forth B'
     alt-c = 'workspace --auto-back-and-forth C'
     alt-z = 'workspace --auto-back-and-forth Z'
+    alt-x = 'workspace --auto-back-and-forth X'
 
     alt-h = 'focus left'
     alt-j = 'focus down'
@@ -174,6 +175,7 @@ on-mode-changed = []
     alt-shift-t = ['move-node-to-workspace T','workspace T']
     alt-shift-b = ['move-node-to-workspace B','workspace B']
     alt-shift-z = ['move-node-to-workspace Z','workspace Z']
+    alt-shift-x = ['move-node-to-workspace X','workspace X']
   
     # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
     alt-tab = 'workspace-back-and-forth'
@@ -285,6 +287,18 @@ on-mode-changed = []
     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
 [[on-window-detected]]
+    if.app-id = 'com.googlecode.iterm2'
+    run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.app-id = 'com.googlecode.iterm2.iTermAI'
+    run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.app-id = 'com.bilibili.bilibiliPC'
+    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
+
+[[on-window-detected]]
     if.app-id = 'com.baidu.BaiduNetdisk-mac'
     run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
 
@@ -295,3 +309,15 @@ on-mode-changed = []
 [[on-window-detected]]
     if.window-title-regex-substring = '^(Cursor|Code|Trae)$'
     run = ['layout floating', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.app-name-regex-substring = '^(com.apple.Safari.WebApp*)'
+    run = ['layout floating', 'move-node-to-workspace X']
+
+[[on-window-detected]]
+    if.app-name-regex-substring = 'com.apple.python'
+    run = ['layout floating']
+[[on-window-detected]]
+    if.window-title-regex-substring = '^(Figure*)'
+    run = ['layout floating']
+
