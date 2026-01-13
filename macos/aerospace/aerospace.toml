@@ -237,10 +237,10 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
     if.window-title-regex-substring = '^(微信|WeChat)$'
-    run = 'layout tiling'
+    run = ['layout tiling']
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
-    run = 'layout floating'
+    run = ['layout floating']
 
 [[on-window-detected]]
     if.app-id = 'org.zotero.zotero'
@@ -307,8 +307,16 @@ on-mode-changed = []
     run = ['layout floating', 'move-node-to-workspace C', 'exec-and-forget center-window']
 
 [[on-window-detected]]
-    if.window-title-regex-substring = '^(Cursor|Code|Trae)$'
-    run = ['layout floating', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+    if.window-title-regex-substring = '^(.*[C|c]ursor.*)$'
+    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.window-title-regex-substring = '^(.*[C|c]ode.*)$'
+    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.window-title-regex-substring = '^(.*[T|t]rae.*)$'
+    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
 
 [[on-window-detected]]
     if.app-name-regex-substring = '^(com.apple.Safari.WebApp*)'
@@ -317,6 +325,11 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-name-regex-substring = 'com.apple.python'
     run = ['layout floating']
+
+[[on-window-detected]]
+    if.app-name-regex-substring = 'com.apple.ActivityMonitor'
+    run = ['layout floating', 'exec-and-forget center-window']
+
 [[on-window-detected]]
     if.window-title-regex-substring = '^(Figure*)'
     run = ['layout floating']
