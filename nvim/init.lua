@@ -426,7 +426,6 @@ require('im_select').setup({
 })
 
 
--- 覆盖 preview 动作（必须在 setup() 之前做）
 local oil = require("oil")
 local util = require("oil.util")
 
@@ -476,7 +475,7 @@ require("oil.actions").preview = {
 
             vim.cmd(cmd)
             local preview_win = vim.api.nvim_get_current_win()
-            vim.cmd("wincmd p") -- ← 回到 oil buffer 保持焦点
+            vim.cmd("wincmd p") 
 
             local buf = vim.api.nvim_create_buf(false, true)
             vim.api.nvim_win_set_buf(preview_win, buf)
@@ -516,10 +515,12 @@ require("oil").setup({
     },
     -- Window-local options to use for oil buffers
     win_options = {
-        wrap = true,
         signcolumn = "no",
+        number = false,
+        relativenumber = false,
+        wrap = false,
         cursorcolumn = false,
-        foldcolumn = "0",
+        foldcolumn = "1",
         spell = false,
         list = true,
         conceallevel = 3,
@@ -701,6 +702,7 @@ require("oil").setup({
 })
 
 
+
 -- lua, default settings
 require("better_escape").setup {
     timeout = 200,           -- after `timeout` passes, you can press the escape key and the plugin will ignore it
@@ -765,9 +767,6 @@ require('neoscroll').setup({
 })
 
 
-
-
-
 require("transparent").setup({
     groups = {
         'Normal', 'NormalNC', 'Comment', 'Constant', 'Special', 'Identifier',
@@ -803,7 +802,7 @@ require("transparent").setup({
         "TelescopePreviewNormal", "TelescopePreviewMessage", "TelescopePreviewMessageFillchar",
         "TelescopePromptPrefix", "TelescopeMatching", "TelescopeTitle", "TelescopeBorder",
         "TelescopeResultsTitle", "TelescopeNormal", "TelescopePreviewBorder", "TelescopeResultsBorder",
-        "TelescopePromptBorder", "TelescopePromptNormal", "TelescopeResultsNormal", 
+        "TelescopePromptBorder", "TelescopePromptNormal", "TelescopeResultsNormal",
         "TelescopeSelection",
         "TelescopeSelectionCaret",
         "TabLine", "TabLineFill",
@@ -836,3 +835,30 @@ vim.keymap.set("v", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 
 
 enhance_syntax_highlighting()
+
+-- open and loadview
+vim.api.nvim_create_autocmd("BufWinEnter", {
+    pattern = "*",
+    command = "silent! loadview"
+})
+
+-- close and makeview
+vim.api.nvim_create_autocmd("BufWinLeave", {
+    pattern = "*",
+    command = "silent! mkview"
+})
+
+require("chafa").setup({
+    render = {
+        min_padding = 5,
+        show_label = true,
+    },
+    events = {
+        update_on_nvim_resize = true,
+    },
+})
+
+require('render-markdown').setup({
+    file_types = { 'markdown', 'vimwiki' },
+})
+vim.treesitter.language.register('markdown', 'vimwiki')

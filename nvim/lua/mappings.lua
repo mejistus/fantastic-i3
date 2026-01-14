@@ -309,3 +309,4 @@ end
 vim.keymap.set("n", "<space>dg", ToggleDiagnostics, { desc = "Toggle LSP diagnostics" })
 vim.keymap.set("n", "<space>f", [[<cmd>lua vim.diagnostic.open_float()<CR>]], { desc = "Toggle LSP diagnostics" })
 vim.keymap.set({ 'n', 'v' }, '<leader>ca', vim.lsp.buf.code_action, { desc = 'Code Action' })
+

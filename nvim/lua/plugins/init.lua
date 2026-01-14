@@ -124,4 +124,19 @@ return {
         config = function()
         end
     },
+    {
+        "princejoogie/chafa.nvim",
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+            "m00qek/baleia.nvim"
+        }
+    },
+    {
+        'MeanderingProgrammer/render-markdown.nvim',
+		cmd = { 'RenderMarkdown' },
+        dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.nvim' }, -- if you use the mini.nvim suite
+        ---@module 'render-markdown'
+        ---@type render.md.UserConfig
+        opts = {},
+    }
 }

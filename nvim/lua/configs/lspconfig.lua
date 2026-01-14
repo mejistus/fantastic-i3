@@ -11,22 +11,25 @@ local on_attach = function(client, bufnr)
 end
 local on_init = require("nvchad.configs.lspconfig").on_init
 local capabilities = require("nvchad.configs.lspconfig").capabilities
-local lspconfig = require "lspconfig"
 local servers = { "html", "cssls", "pyright",
     "clangd", "cmake", "cssls", "html", "ts_ls",
-    "texlab", "bashls", "jsonls" ,"arduino_language_server"}
+    "texlab", "bashls", "jsonls", "arduino_language_server" }
 
 -- lsps with default config
 for _, lsp in ipairs(servers) do
-    lspconfig[lsp].setup {
+    vim.lsp.config(lsp, {
         on_attach = on_attach,
         on_init = on_init,
         capabilities = capabilities,
-    }
+    })
 end
 
+vim.lsp.config("clangd", {
+    cmd = { "clangd", "--background-index", "--clang-tidy" },
+    filetypes = { "c", "cpp", "objc", "objcpp" },
+})
 
-require("lspconfig").pyright.setup {
+vim.lsp.config("pyright", {
     on_attach = on_attach,
     capabilities = capabilities,
     settings = {
@@ -42,14 +45,18 @@ require("lspconfig").pyright.setup {
                     reportOptionalUnnecessary          = "information",
                     reportOptionalUnspecified          = "warning",
                     reportUnnecessaryTypeIgnoreComment = "none",
-                    reportAssignmentType = "information",
-                    reportArgumentType = 'warning',
-                    reportCallIssue = "warning",
-                    reportOperatorIssue = "warning",
-                    reportPrivateImportUsage = "information"
+                    reportAssignmentType               = "information",
+                    reportArgumentType                 = 'warning',
+                    reportCallIssue                    = "warning",
+                    reportOperatorIssue                = "warning",
+                    reportPrivateImportUsage           = "information"
                 },
             },
         },
     },
     cmd_env = { NODE_OPTIONS = "--max-old-space-size=6000" },
-}
+})
+
+for _, lsp in ipairs(servers) do
+    vim.lsp.enable(lsp)
+end
