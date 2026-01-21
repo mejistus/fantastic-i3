@@ -307,6 +307,14 @@ on-mode-changed = []
     run = ['layout floating', 'move-node-to-workspace C', 'exec-and-forget center-window']
 
 [[on-window-detected]]
+    if.app-name-regex-substring = '^(Google Gemini)'
+    run = ['layout floating', 'move-node-to-workspace C']
+
+[[on-window-detected]]
+    if.app-id= 'com.openai.chat'
+    run = ['layout floating', 'move-node-to-workspace C']
+
+[[on-window-detected]]
     if.window-title-regex-substring = '^(.*[C|c]ursor.*)$'
     run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
 
@@ -319,18 +327,27 @@ on-mode-changed = []
     run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
 
 [[on-window-detected]]
-    if.app-name-regex-substring = '^(com.apple.Safari.WebApp*)'
-    run = ['layout floating', 'move-node-to-workspace X']
+    if.app-name-regex-substring = '^(小红书|X|知乎)$'
+    run = ['layout tiling', 'move-node-to-workspace X']
 
 [[on-window-detected]]
-    if.app-name-regex-substring = 'com.apple.python'
+    if.app-id = 'com.apple.ActivityMonitor'
+    run = ['layout floating', 'exec-and-forget center-window']
+
+[[on-window-detected]]
+    if.app-id = 'com.apple.Preview'
     run = ['layout floating']
 
 [[on-window-detected]]
-    if.app-name-regex-substring = 'com.apple.ActivityMonitor'
-    run = ['layout floating', 'exec-and-forget center-window']
+    if.app-id = 'com.apple.PhotoBooth'
+    run = ['layout floating']
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(Figure*)'
     run = ['layout floating']
+
+[[on-window-detected]]
+    if.window-title-regex-substring = '^(python*)'
+    run = ['layout floating']
+
 
