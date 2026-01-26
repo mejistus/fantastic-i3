@@ -34,7 +34,8 @@ default-root-container-orientation = 'auto'
 # See https://nikitabobko.github.io/AeroSpace/guide#on-focus-changed-callbacks
 # See https://nikitabobko.github.io/AeroSpace/commands#move-mouse
 # Fallback value (if you omit the key): on-focused-monitor-changed = []
-on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+# on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+on-focused-monitor-changed = []
 
 # You can effectively turn off macOS "Hide application" (cmd-h) feature by toggling this flag
 # Useful if you don't use this macOS feature, but accidentally hit cmd-h or cmd-alt-h key
@@ -55,10 +56,9 @@ on-mode-changed = []
 
 [exec]
     inherit-env-vars = true
+
 [exec.env-vars]
     PATH = '/bin:/opt/homebrew/bin:/opt/homebrew/sbin:${HOME}/.local/bin:${PATH}'
-
-
 
 # Possible values: (qwerty|dvorak|colemak)
 # See https://nikitabobko.github.io/AeroSpace/guide#key-mapping
@@ -227,28 +227,29 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.baidu.netdisk'
-    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
+    run = ['layout floating', 'move-node-to-workspace B']
 
 
 [[on-window-detected]]
     if.app-id = 'com.kangfenmao.CherryStudio'
     run = ['layout floating','exec-and-forget center-window']
 
+# [[on-window-detected]]
+#     if.app-id = 'com.tencent.xinWeChat'
+#     if.window-title-regex-substring = '^(微信|WeChat)$'
+#     run = ['layout tiling']
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
-    if.window-title-regex-substring = '^(微信|WeChat)$'
-    run = ['layout tiling']
+    run = ['layout floating', 'move-node-to-workspace 10']
+
 [[on-window-detected]]
-    if.app-id = 'com.tencent.xinWeChat'
-    run = ['layout floating']
+    if.app-id = 'org.zotero.zotero'
+    run = 'layout floating'
 
 [[on-window-detected]]
     if.app-id = 'org.zotero.zotero'
     if.window-title-regex-substring = '^(zotero)$'
-    run = 'layout tiling'
-[[on-window-detected]]
-    if.app-id = 'org.zotero.zotero'
-    run = 'layout floating'
+    run = ['layout tiling', 'move-node-to-workspace 1']
 
 [[on-window-detected]]
     if.app-id = 'com.microsoft.Powerpoint'
@@ -296,15 +297,20 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.bilibili.bilibiliPC'
-    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
+    run = ['layout floating', 'move-node-to-workspace B']
+
+[[on-window-detected]]
+    if.app-id = 'com.tencent.QQMusicMac'
+    run = ['layout floating', 'move-node-to-workspace B']
+
 
 [[on-window-detected]]
     if.app-id = 'com.baidu.BaiduNetdisk-mac'
-    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
+    run = ['layout floating', 'move-node-to-workspace B']
 
 [[on-window-detected]]
     if.app-id = 'com.anthropic.claudefordesktop'
-    run = ['layout floating', 'move-node-to-workspace C', 'exec-and-forget center-window']
+    run = ['layout floating', 'move-node-to-workspace C']
 
 [[on-window-detected]]
     if.app-name-regex-substring = '^(Google Gemini)'
@@ -340,6 +346,10 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.apple.PhotoBooth'
+    run = ['layout floating']
+
+[[on-window-detected]]
+    if.app-id = 'com.apple.AppStore'
     run = ['layout floating']
 
 [[on-window-detected]]
