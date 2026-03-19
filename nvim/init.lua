@@ -147,6 +147,15 @@ vim.api.nvim_set_keymap('t', '<sc-v>', '<C-\\><C-n>"+Pi', { noremap = true })
 vim.g.tex_flavor = 'latex'
 vim.g.vimtex_quickfix_mode = 0
 vim.g.vimtex_compiler_method = 'latexmk'
+vim.g.vimtex_compiler_latexmk = {
+    options = {
+        '-pdf',
+        '-verbose',
+        '-file-line-error',
+        '-synctex=1',
+        '-interaction=nonstopmode',
+    }
+}
 vim.g.vimtex_toc_config = {
     name = 'TOC',
     layers = { 'content', 'todo', 'include' },
@@ -185,8 +194,13 @@ vim.g.vimtex_compiler_latexmk = {
     executable = 'latexmk',
     hooks = {},
     options = {
-        '-verbose', '-file-line-error', '-shell-escape', '-synctex=1', '-interaction=nonstopmode',
-        -- '-aux-directory=build' -- 仅中间文件输出到 build 目录
+        '-pdf',
+        '-bibtex',
+        '-verbose',
+        '-file-line-error',
+        '-shell-escape',
+        '-synctex=1',
+        '-interaction=nonstopmode',
     },
 }
 
