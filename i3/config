@@ -1,4 +1,4 @@
-# font for window titles and bar
+font for window titles and bar
 # font pango:Source Sans Pro 10
 
 font pango:Noto Sans 10
@@ -46,10 +46,10 @@ floating_modifier $mod
 # control focused window when follows the mouse movements
 # focus_on_window_activation none
 # window border settings
-#1default_border          none
-# default_border          pixel 2
+# default_border          none
+default_border          pixel 1
 #default_border          none 
-# default_floating_border pixel 2
+default_floating_border pixel 1
 
 # floating_minimum_size 32 x 18
 # floating_maximum_size 1920 x 1080
@@ -72,7 +72,9 @@ bindsym $mod+space exec --no-startup-id pkill -x rofi || bash ~/.config/rofi/lau
 bindsym $alt+Tab exec --no-startup-id pkill -x rofi || rofi -show window
 bindsym $mod+Tab workspace back_and_forth
 # bindsym $mod+g exec --no-startup-id google-chrome-stable
-bindsym $mod+g exec --no-startup-id qutebrowser
+# bindsym $mod+g exec --no-startup-id firefox
+bindsym $mod+g exec --no-startup-id microsoft-edge-stable
+# bindsym $mod+g exec --no-startup-id qutebrowser
 # bindsym $mod+n exec --no-startup-id neovide
 bindsym $mod+d exec --no-startup-id dolphin
 # bindsym Ctrl+$mod+d exec --no-startup-id rofi-zeal
@@ -88,10 +90,10 @@ bindsym $mod+q kill
 
 
 # alternatively, you can use the cursor keys:
-bindsym $mod+h focus left
-bindsym $mod+j focus down
-bindsym $mod+k focus up
-bindsym $mod+l focus right
+# bindsym $mod+h focus left
+# bindsym $mod+j focus down
+# bindsym $mod+k focus up
+# bindsym $mod+l focus right
 bindsym $mod+Left   focus left
 bindsym $mod+Down   focus down
 bindsym $mod+Right  focus right
@@ -117,9 +119,9 @@ bindsym $alt+Ctrl+v split v
 # enter fullscreen mode for the focused container
 bindsym $mod+f fullscreen toggle
 
-
+#
 # bindsym $mod+s layout stacking
-bindsym $mod+s layout tabbed
+# bindsym $mod+s layout tabbed
 bindsym $mod+Shift+s layout toggle split
 
 # toggle tiling / floating
@@ -159,7 +161,7 @@ bindsym $mod+Shift+m move position center
 # bindsym $mod+t border normal    0
 # bindsym $mod+y border pixel     1
 bindsym $mod+u border none
-bindsym $mod+Shift+u border pixel 3
+bindsym $mod+Shift+u border pixel 1
 
 # switch to workspace
 bindsym $mod+1 workspace $ws1
@@ -202,14 +204,14 @@ bindsym $mod+Ctrl+Right workspace next
 bindsym $mod+Ctrl+Left  workspace prev
 bindsym $mod+Ctrl+l workspace next
 bindsym $mod+Ctrl+h workspace prev
-bindsym Ctrl+Right exec --no-startup-id "bash ~/.config/i3/move_workspace.sh next"
-bindsym Ctrl+Left  exec --no-startup-id "bash ~/.config/i3/move_workspace.sh prev"
 
-bindsym Ctrl+l exec --no-startup-id "bash ~/.config/i3/move_workspace.sh next"
-bindsym Ctrl+h exec --no-startup-id "bash ~/.config/i3/move_workspace.sh prev"
-#bindsym $mod+l exec --no-startup-id "betterlockscreen --lock"
-bindsym $mod+o exec --no-startup-id "bash /usr/bin/blurlocker"
-bindsym $mod+m exec --no-startup-id "sh ~/.config/rofi/powermenu.sh
+bindsym Ctrl+Right exec --no-startup-id "bash $HOME/.config/i3/move_workspace.sh next"
+bindsym Ctrl+Left  exec --no-startup-id "bash $HOME/.config/i3/move_workspace.sh prev"
+bindsym Ctrl+l exec --no-startup-id "bash $HOME/.config/i3/move_workspace.sh next"
+bindsym Ctrl+h exec --no-startup-id "bash $HOME/.config/i3/move_workspace.sh prev"
+
+bindsym $mod+l exec --no-startup-id "bash $HOME/.config/i3/blurlocker"
+bindsym $mod+m exec --no-startup-id "bash $HOME/.config/rofi/powermenu.sh"
 
 # Take a full screenshot store in file
 bindsym $mod+Shift+p exec --no-startup-id "spectacle -l"
@@ -255,11 +257,11 @@ mode "  " {
 }
 
 
-focus_follows_mouse yes
-focus_on_window_activation urgent
+# focus_follows_mouse yes
+# focus_on_window_activation urgent
 # no_focus [all]
 no_focus [class="matplotlib"]
-for_window [class=.*] border pixel 3
+for_window [class=.*] border pixel 1
 # for_window [urgent="latest"] focus
 # set specific windows to floating mode 
 # for_window [class="kitty"]                          scratchpad show, resize set 1200 900
@@ -297,7 +299,7 @@ for_window [class="trayer"]                         floating enable
 for_window [title="yad-calendar"]                   floating enable
 for_window [title="spectacle"]                      floating enable
 for_window [class="Nl.hjdskes.gcolor3"]             floating enable
-for_window [class="wps"]                          floating enable 
+for_window [class="wps"]                            floating enable 
 # for_window [class="neovide"]                        gaps 0
 # for_window [class="Zathura"]                        gaps 0
 for_window [title="Figure*"]                        floating enable
@@ -305,14 +307,16 @@ for_window [title="panel"]                          floating enable
 for_window [title="Zotero"]                         floating enable
 for_window [title="Steam"]                          floating enable
 for_window [window_role="bubble"]                   floating enable
-for_window [window_role="(?i)(?:pop-up|setup)"]      floating enable
-for_window [class="(?i)(?:qt5ct|pinentry)"]          floating enable, focus
+for_window [window_role="(?i)(?:pop-up|setup)"]     floating enable
+for_window [class="(?i)(?:qt5ct|pinentry)"]         floating enable, focus
+for_window [class="wechat"]                         floating enable
 for_window [title="(?i)(?:copying|deleting|moving)"] floating enable
+for_window [title="(?i)群公告$"]                    floating enable
 
 
-# for_window [class="neovide"]                        border pixel 0  gaps 0
+for_window [class="neovide"]                        border pixel 0  gaps 0
 for_window [class="Zathura"]                        border pixel 0  gaps 0
-# for_window [class="feh"]                            floating enable
+for_window [class="feh"]                            floating enable
 # for_window [class="Microsoft-edge"] floating enable
 # for_window [class="Google-chrome"] floating enable
 # for_window [class="wps"]                            floating enable
@@ -320,8 +324,8 @@ for_window [class="bilibili"]                     floating enable
 
 # #546735 -> #81a1c1
 # class                 border  backgr. text    indicator child_border
-# client.focused          #81a1f1 #81a1f1 #F8F8F2 #81a1f1   #81a1f1
-client.focused          #11f1f1 #11f1f1 #F8F8F2 #11f1f1   #11f1f1
+client.focused          #81a1f1 #81a1f1 #F8F8F2 #81a1f1   #81a1f1
+# client.focused          #11f1f1 #11f1f1 #F8F8F2 #11f1f1   #11f1f1
 client.focused_inactive #2E3440 #2E3440 #F8F8F2 #2E3440   #2E3440
 client.unfocused        #2E3440 #2E3440 #BFBFBF #2E3440   #2E3440
 client.urgent           #2E3440 #FF5555 #F8F8F2 #FF5555   #FF5555
@@ -342,9 +346,11 @@ client.background       #F8F8F2
 
 # local config file
 # startup applications
+exec_always --no-startup-id /usr/lib/polkit-kde-authentication-agent-1
+exec_always --no-startup-id dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
+exec_always --no-startup-id dbus-update-activation-environment --all
 exec_always --no-startup-id sh ~/.config/i3/monitors.sh
 exec_always --no-startup-id conky -c ~/.config/conky/slate-conky-theme/slate-conky.conf
-exec_always --no-startup-id bash ~/.config/polybar/launch.sh 
 exec_always --no-startup-id dunst
-exec_always --no-startup-id picom --config ~/.config/picom/picom.conf
+# exec_always --no-startup-id picom --config ~/.config/picom/picom.conf
 exec_always --no-startup-id sh ~/.config/i3/start.sh
