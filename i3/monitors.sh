@@ -3,7 +3,8 @@
 # xrandr --output DP-1 --mode 2560x1440 --rate 165 --primary
 # extended join
 # xrandr --output HDMI-1  --mode 2560x1440 --rate 144 --below DP-1
-xrandr --output HDMI-1  --mode 2560x1440 --rate 144 --primary
+# xrandr --output HDMI-1  --mode 2560x1440 --rate 120 --primary --rotate left
+xrandr --output HDMI-1  --mode 2560x1440 --rate 120 --primary --rotate normal
 # xrandr --output eDP-1 
 # xrandr --output HDMI-2 
 # xrandr --output HDMI-1 
