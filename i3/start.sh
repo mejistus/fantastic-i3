@@ -9,4 +9,6 @@ i3-auto-tiling &
 i3-auto-layout &
 bash $HOME/.config/i3/NIC.sh
 xset r rate 300 50& 
-# picom &
+xset -dpms
+xset s off
+picom &

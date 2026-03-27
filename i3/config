@@ -40,6 +40,8 @@ workspace 10 output HDMI-1
 
 # use $mod+Mouse to drag floating windows to their wanted position
 floating_modifier $mod
+
+focus_follows_mouse no
 # tiling_drag on
 # tiling_drag modifier
 # |titlebar
@@ -247,9 +249,9 @@ mode "  " {
     bindsym Down    resize grow   height 36 px or 36 ppt
     bindsym Up      resize shrink height 36 px or 36 ppt
     bindsym h       resize shrink width 64 px or 64 ppt
-    bindsym j       resize grow   width 64 px or 64 ppt
-    bindsym l       resize grow   height 36 px or 36 ppt
-    bindsym k       resize shrink height 36 px or 36 ppt
+    bindsym l       resize grow   width 64 px or 64 ppt
+    bindsym k       resize grow   height 36 px or 36 ppt
+    bindsym j       resize shrink height 36 px or 36 ppt
     # back to normal: Enter or win+r
     bindsym Return mode "default" move position center
     bindsym $mod+r mode "default" move position center
@@ -257,7 +259,6 @@ mode "  " {
 }
 
 
-# focus_follows_mouse yes
 # focus_on_window_activation urgent
 # no_focus [all]
 no_focus [class="matplotlib"]
