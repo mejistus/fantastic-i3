@@ -1,0 +1,38 @@
+MenuBar=Disabled
+
+[CompactMode]
+IconSize=32
+PreviewSize=96
+
+[ContextMenu]
+ShowOpenTerminal=false
+
+[DetailsMode]
+PreviewSize=96
+
+[General]
+ShowFullPath=true
+ShowFullPathInTitlebar=true
+ShowStatusBar=FullWidth
+Version=202
+ViewPropsTimestamp=2025,3,9,17,3,53.145
+
+[IconsMode]
+IconSize=48
+PreviewSize=80
+
+[KFileDialog Settings]
+Places Icons Auto-resize=false
+Places Icons Static Size=22
+
+[MainWindow]
+MenuBar=Disabled
+
+[Notification Messages]
+ApplicationLanguageChangedWarning=false
+
+[PreviewSettings]
+Plugins=appimagethumbnail,glycin-heif,blenderthumbnail,comicbookthumbnail,djvuthumbnail,ebookthumbnail,exrthumbnail,glycin-image-rs,glycin-jxl,jpegthumbnail,kraorathumbnail,windowsimagethumbnail,windowsexethumbnail,mobithumbnail,opendocumentthumbnail,gsthumbnail,rawthumbnail,glycin-svg,svgthumbnail,cursorthumbnail,imagethumbnail,directorythumbnail,audiothumbnail
+
+[UiSettings]
+ColorScheme=KvGnome
