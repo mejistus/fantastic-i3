@@ -58,17 +58,7 @@ return {
     {
         "yorickpeterse/nvim-window",
     },
-    {
-        'kevinhwang91/nvim-ufo',
-        dependencies = { 'kevinhwang91/promise-async' },
-        config = function()
-            require("ufo").setup({
-                provider_selector = function(bufnr, filetype, buftype)
-                    return { 'treesitter', 'indent' }
-                end
-            })
-        end
-    },
+
     {
         "Exafunction/codeium.nvim",
         dependencies = {
@@ -85,12 +75,6 @@ return {
         init = function()
             -- VimTeX configuration goes here, e.g.
         end
-    },
-    -- Lua
-    {
-        "folke/twilight.nvim",
-        opts = {
-        }
     },
     {
         "keaising/im-select.nvim",
@@ -117,12 +101,6 @@ return {
         end,
     },
     {
-        "edluffy/hologram.nvim",
-        config = function()
-            require("hologram").setup { auto_display = true }
-        end
-    },
-    {
         'nvim-treesitter/playground',
         cmd = { "TSPlaygroundToggle", "TSHighlightCapturesUnderCursor" },
         dependencies = { 'nvim-treesitter/nvim-treesitter' },
@@ -142,14 +120,6 @@ return {
         opts = {},
     },
     {
-        'VonHeikemen/fine-cmdline.nvim',
-        dependencies = {
-            'MunifTanjim/nui.nvim'
-        },
-        config = function()
-        end
-    },
-    {
         "xiyaowong/transparent.nvim",
         config = function()
         end
@@ -160,5 +130,13 @@ return {
             "nvim-lua/plenary.nvim",
             "m00qek/baleia.nvim"
         }
+    },
+    {
+        'MeanderingProgrammer/render-markdown.nvim',
+		cmd = { 'RenderMarkdown' },
+        dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.nvim' }, -- if you use the mini.nvim suite
+        ---@module 'render-markdown'
+        ---@type render.md.UserConfig
+        opts = {},
     }
 }
