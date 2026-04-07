@@ -120,11 +120,17 @@ on-mode-changed = []
   [ -n "$wid" ] && aerospace focus --window-id "$wid"
   osascript -e "tell application \"Safari\" to activate"
 ' ''']
-    alt-t = 'workspace --auto-back-and-forth T'
-    alt-b = 'workspace --auto-back-and-forth B'
-    alt-c = 'workspace --auto-back-and-forth C'
-    alt-z = 'workspace --auto-back-and-forth Z'
-    alt-x = 'workspace --auto-back-and-forth X'
+    # alt-t = 'workspace --auto-back-and-forth T'
+    # alt-b = 'workspace --auto-back-and-forth B'
+    # alt-c = 'workspace --auto-back-and-forth C'
+    # alt-z = 'workspace --auto-back-and-forth Z'
+    # alt-x = 'workspace --auto-back-and-forth X'
+
+    alt-t = 'workspace T'
+    alt-b = 'workspace B'
+    alt-c = 'workspace C'
+    alt-z = 'workspace Z'
+    alt-x = 'workspace X'
 
     alt-h = 'focus left'
     alt-j = 'focus down'
@@ -136,7 +142,8 @@ on-mode-changed = []
     alt-right = 'focus right'
 
     alt-f = 'fullscreen'
-    alt-shift-f = ['layout floating tiling', 'exec-and-forget center-window']
+    alt-shift-f = ['layout floating tiling']
+    # alt-shift-f = ['layout floating tiling', 'exec-and-forget center-window']
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#move
     alt-shift-h = 'move left'
@@ -170,7 +177,7 @@ on-mode-changed = []
     alt-shift-7 = ['move-node-to-workspace 7' ,'workspace 7 ']
     alt-shift-8 = ['move-node-to-workspace 8' ,'workspace 8 ']
     alt-shift-9 = ['move-node-to-workspace 9' ,'workspace 9 ']
-    alt-shift-0 = ['move-node-to-workspace 10','workspace 10']
+    alt-shift-0 = ['move-node-to-workspace 10' ,'workspace 10 ']
     alt-shift-c = ['move-node-to-workspace C','workspace C']
     alt-shift-t = ['move-node-to-workspace T','workspace T']
     alt-shift-b = ['move-node-to-workspace B','workspace B']
@@ -182,13 +189,13 @@ on-mode-changed = []
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
     alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
     alt-r = 'mode resize'
-    alt-ctrl-c = ['exec-and-forget center-window']
+    # alt-ctrl-c = ['exec-and-forget center-window']
     # See: https://nikitabobko.github.io/AeroSpace/commands#mode
     ctrl-s = 'mode service'
     ctrl-l = ["workspace next"]
     ctrl-h = ["workspace prev"]
-    ctrl-right = ["workspace next"]
-    ctrl-left = ["workspace prev"]
+    # ctrl-right = ["workspace next"]
+    # ctrl-left = ["workspace prev"]
     
 
 # 'service' binding mode declaration.
@@ -196,8 +203,7 @@ on-mode-changed = []
 [mode.service.binding]
     esc = ['reload-config', 'mode main']
     r = ['mode resize'] # reset layout
-    f = ['layout floating tiling', 'exec-and-forget center-window', 'mode main'] # Toggle between floating and tiling layout
-    # backspace = ['close-all-windows-but-current', 'mode main']
+    f = '''exec-and-forget aerospace list-windows --workspace focused --format '%{window-id} %{window-layout}' | awk '$2=="floating"{print $1}' | while read -r id; do aerospace layout --window-id "$id" tiling; done; aerospace flatten-workspace-tree; aerospace balance-sizes'''
     space = ['mode main']
     j = ['layout tiles horizontal vertical', 'mode main']
 
@@ -234,10 +240,11 @@ on-mode-changed = []
     if.app-id = 'com.kangfenmao.CherryStudio'
     run = ['layout floating','exec-and-forget center-window']
 
-# [[on-window-detected]]
-#     if.app-id = 'com.tencent.xinWeChat'
-#     if.window-title-regex-substring = '^(微信|WeChat)$'
-#     run = ['layout tiling']
+[[on-window-detected]]
+    if.app-id = 'com.tencent.xinWeChat'
+    if.window-title-regex-substring = '^(微信|WeChat)$'
+    run = ['layout floating', 'move-node-to-workspace 10', 'exec-and-forget center-window']
+
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
     run = ['layout floating', 'move-node-to-workspace 10']
@@ -287,13 +294,17 @@ on-mode-changed = []
     if.app-id = 'net.kovidgoyal.kitty'
     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
-[[on-window-detected]]
-    if.app-id = 'com.googlecode.iterm2'
-    run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
+# [[on-window-detected]]
+#     if.app-id = 'com.googlecode.iterm2'
+#     run = ['layout tiling', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
 [[on-window-detected]]
-    if.app-id = 'com.googlecode.iterm2.iTermAI'
-    run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
+    if.app-id = 'com.googlecode.iterm2'
+    run = ['layout floating']
+
+# [[on-window-detected]]
+#     if.app-id = 'com.googlecode.iterm2.iTermAI'
+#     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
 [[on-window-detected]]
     if.app-id = 'com.bilibili.bilibiliPC'
@@ -310,7 +321,7 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.anthropic.claudefordesktop'
-    run = ['layout floating', 'move-node-to-workspace C']
+    run = ['layout tiling', 'move-node-to-workspace C']
 
 [[on-window-detected]]
     if.app-name-regex-substring = '^(Google Gemini)'
@@ -318,7 +329,7 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id= 'com.openai.chat'
-    run = ['layout floating', 'move-node-to-workspace C']
+    run = ['layout tiling', 'move-node-to-workspace C']
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[C|c]ursor.*)$'
@@ -326,11 +337,11 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[C|c]ode.*)$'
-    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+    run = ['layout tiling', 'move-node-to-workspace Z']
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[T|t]rae.*)$'
-    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+    run = ['layout tiling', 'move-node-to-workspace Z']
 
 [[on-window-detected]]
     if.app-name-regex-substring = '^(小红书|X|知乎)$'
@@ -360,4 +371,18 @@ on-mode-changed = []
     if.window-title-regex-substring = '^(python*)'
     run = ['layout floating']
 
-
+[workspace-to-monitor-force-assignment]
+    # X = ["built-in"]
+    # Z = ["built-in"]
+    # 1 = ["built-in"]
+    # 2 = ["built-in"]
+    # 3 = ["built-in"]
+    # 4 = ["built-in"]
+    # 5 = ["built-in"]
+    # 6 = ["built-in"]
+    # 7 = ["built-in"]
+    # 8 = ["built-in"]
+    # 9 = ["built-in"]
+    # 0 = ["secondary"]
+    # B = ["secondary"]
+    # T = ["secondary"]
