@@ -2,8 +2,31 @@ local map = vim.keymap.set
 
 map("n", ";;", "<cmd>noh<CR>", { desc = "clear highlights" })
 map("n", "F", vim.lsp.buf.hover, { desc = "lsp hover" })
-map("n", "\\v", "<cmd>vsplit<CR>", { desc = "split vertically" })
-map("n", "\\h", "<cmd>split<CR>", { desc = "split horizontally" })
+-- Backslash prefix: window management.
+map("n", "\\v", "<cmd>vsplit<CR>", { desc = "window split vertical" })
+map("n", "\\s", "<cmd>split<CR>", { desc = "window split horizontal" })
+map("n", "\\x", "<cmd>close<CR>", { desc = "window close" })
+map("n", "\\o", "<cmd>only<CR>", { desc = "window close others" })
+map("n", "\\=", "<C-w>=", { desc = "window balance" })
+map("n", "\\h", "<C-w>h", { desc = "window left" })
+map("n", "\\j", "<C-w>j", { desc = "window down" })
+map("n", "\\k", "<C-w>k", { desc = "window up" })
+map("n", "\\l", "<C-w>l", { desc = "window right" })
+map("n", "\\<Left>", "<C-w>h", { desc = "window left" })
+map("n", "\\<Down>", "<C-w>j", { desc = "window down" })
+map("n", "\\<Up>", "<C-w>k", { desc = "window up" })
+map("n", "\\<Right>", "<C-w>l", { desc = "window right" })
+map("n", "\\H", "<cmd>vertical resize -5<CR>", { desc = "window narrower" })
+map("n", "\\L", "<cmd>vertical resize +5<CR>", { desc = "window wider" })
+map("n", "\\J", "<cmd>resize -3<CR>", { desc = "window shorter" })
+map("n", "\\K", "<cmd>resize +3<CR>", { desc = "window taller" })
+map("n", "\\<S-Left>", "<cmd>vertical resize -5<CR>", { desc = "window narrower" })
+map("n", "\\<S-Right>", "<cmd>vertical resize +5<CR>", { desc = "window wider" })
+map("n", "\\<S-Down>", "<cmd>resize -3<CR>", { desc = "window shorter" })
+map("n", "\\<S-Up>", "<cmd>resize +3<CR>", { desc = "window taller" })
+map("n", "\\w", function()
+  require("nvim-window").pick()
+end, { desc = "window pick" })
 map("n", "<leader>w", function()
   require("nvim-window").pick()
 end, { desc = "pick window" })
@@ -22,7 +45,6 @@ map("v", "<S-j>", "<C-d>", { desc = "scroll down half page" })
 map("n", "<tab>", "<cmd>bnext<CR>", { desc = "next buffer" })
 map("n", "<S-tab>", "<cmd>bprevious<CR>", { desc = "previous buffer" })
 map("n", "<space>x", "<cmd>bd<CR>", { desc = "close buffer" })
-map("n", "\\x", "<cmd>bd<CR>", { desc = "close buffer" })
 
 map("n", "<leader>/", "gcc", { desc = "comment toggle", remap = true })
 map("v", "<leader>/", "gc", { desc = "comment toggle", remap = true })
@@ -40,14 +62,47 @@ map("n", "<leader>ff", "<cmd>Telescope find_files<CR>", { desc = "find files" })
 map("n", "<leader>fa", "<cmd>Telescope find_files follow=true no_ignore=true hidden=true<CR>", { desc = "find all files" })
 
 map("t", "<C-x>", "<C-\\><C-n>", { desc = "escape terminal mode" })
-map({ "n", "t" }, "<leader><CR>", function()
+local float_term_buf = nil
+local float_term_win = nil
+
+local function centered_term_win_opts()
   local width = math.floor(vim.o.columns * 0.8)
-  local height = math.floor(vim.o.lines * 0.8)
-  vim.cmd("botright " .. height .. "split")
-  vim.cmd("terminal")
-  vim.cmd("resize " .. height)
-  vim.cmd("vertical resize " .. width)
-end, { desc = "open terminal" })
+  local height = math.floor((vim.o.lines - vim.o.cmdheight) * 0.8)
+  local row = math.floor(((vim.o.lines - vim.o.cmdheight) - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+  return {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = "rounded",
+  }
+end
+
+map({ "n", "t" }, "<leader><CR>", function()
+  if float_term_win and vim.api.nvim_win_is_valid(float_term_win) then
+    vim.api.nvim_win_close(float_term_win, true)
+    float_term_win = nil
+    return
+  end
+
+  if not (float_term_buf and vim.api.nvim_buf_is_valid(float_term_buf)) then
+    float_term_buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[float_term_buf].buflisted = false
+    vim.bo[float_term_buf].bufhidden = "hide"
+    vim.api.nvim_buf_call(float_term_buf, function()
+      vim.fn.termopen(vim.o.shell)
+    end)
+  end
+
+  float_term_win = vim.api.nvim_open_win(float_term_buf, true, centered_term_win_opts())
+  vim.wo[float_term_win].number = false
+  vim.wo[float_term_win].relativenumber = false
+  vim.wo[float_term_win].signcolumn = "no"
+  vim.cmd("startinsert")
+end, { desc = "toggle centered floating terminal" })
 map("n", "<leader>wK", "<cmd>WhichKey<CR>", { desc = "whichkey all keymaps" })
 map("n", "<leader>wk", function()
   vim.cmd("WhichKey " .. vim.fn.input("WhichKey: "))
