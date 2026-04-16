@@ -17,7 +17,11 @@ return {
       require("configs.whichkey")
     end,
   },
-  { "numToStr/Comment.nvim", event = "VeryLazy", opts = {} },
+  {
+    "numToStr/Comment.nvim",
+    keys = { "gc", "gcc" },
+    opts = {},
+  },
   {
     "akinsho/bufferline.nvim",
     version = "*",
