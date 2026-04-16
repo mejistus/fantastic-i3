@@ -41,14 +41,12 @@ local function collect_top_level_ops(expr)
         i = i + 1
       else
         local matched = false
-        if depth == 0 then
-          for _, op in ipairs(op_tokens) do
-            if expr:sub(i, i + #op - 1) == op then
-              table.insert(ops, { end_col = i + #op - 1 })
-              i = i + #op
-              matched = true
-              break
-            end
+        for _, op in ipairs(op_tokens) do
+          if expr:sub(i, i + #op - 1) == op then
+            table.insert(ops, { end_col = i + #op - 1, depth = depth })
+            i = i + #op
+            matched = true
+            break
           end
         end
         if not matched then
@@ -58,7 +56,14 @@ local function collect_top_level_ops(expr)
     end
   end
 
-  return ops
+  local base_depth = depth
+  local filtered = {}
+  for _, op in ipairs(ops) do
+    if op.depth == base_depth then
+      table.insert(filtered, { end_col = op.end_col })
+    end
+  end
+  return filtered
 end
 
 local function wrap_last_n_operands(expr, n)
@@ -81,20 +86,52 @@ local function wrap_last_n_operands(expr, n)
   return left .. "(" .. right .. ")"
 end
 
-local function parse_suffix(before_line)
-  local expr, parens = before_line:match("^(.-)%.([)]+)$")
-  if not expr or not parens then
-    return nil, nil
+local function effective_distance(expr, typed_count)
+  local source = trim(expr)
+  if typed_count > 1 and source:sub(-1) == ")" then
+    return typed_count - 1
   end
-  return expr, #parens
+  return typed_count
+end
+
+local function parse_suffix_at_end(before_line)
+  local expr, parens = before_line:match("^(.-)%.([)]*)$")
+  if not expr or parens == nil then
+    return nil, nil, nil
+  end
+  return expr, #parens, ""
+end
+
+local function parse_suffix_anywhere(before_line)
+  local expr, parens, tail = before_line:match("^(.*)%.([)]*)(.*)$")
+  if not expr or parens == nil then
+    return nil, nil, nil
+  end
+  -- Prevent accidental expansion on `a. ` / `a.\t` etc.
+  -- Empty paren suffix is only valid when cursor is exactly after dot.
+  if parens == "" and tail ~= "" then
+    return nil, nil, nil
+  end
+  return expr, #parens, tail or ""
 end
 
 function M.expand_inline(before_line)
-  local expr, count = parse_suffix(before_line)
+  -- Expand only when cursor is immediately after suffix token.
+  -- This avoids accidental expansion like `1.) <Enter>`.
+  local expr, count = parse_suffix_at_end(before_line)
   if not expr then
     return nil
   end
-  return wrap_last_n_operands(expr, count)
+  local typed = math.max(count, 1)
+  if trim(expr) == "" then
+    return nil
+  end
+  return wrap_last_n_operands(expr, effective_distance(expr, typed))
+end
+
+function M.has_suffix_at_end(before_line)
+  local expr, count = parse_suffix_at_end(before_line)
+  return expr ~= nil and count ~= nil and trim(expr) ~= ""
 end
 
 function M.setup()
@@ -109,29 +146,31 @@ function M.setup()
   end
 
   function source:get_trigger_characters()
-    return { ")" }
+    return { ".", ")" }
   end
 
   function source:get_keyword_pattern()
-    -- Match only the suffix token like `.)`, `.))`, `.)))` so cmp can keep our items.
-    return [[\.[)]\+]]
+    -- Match suffix token like `.`, `.)`, `.))`, `.)))`.
+    return [[\.[)]*]]
   end
 
   function source:complete(params, callback)
     local before = params.context.cursor_before_line
-    local expr, typed_count = parse_suffix(before)
+    local expr, typed_count = parse_suffix_at_end(before)
     if not expr then
       callback({ items = {}, isIncomplete = false })
       return
     end
 
     local items = {}
-    for n = typed_count, 5 do
+    local start_n = math.max(typed_count, 1)
+    for n = start_n, 5 do
       local trigger = "." .. string.rep(")", n)
+      local distance = effective_distance(expr, n)
       table.insert(items, {
         label = trigger,
         kind = cmp.lsp.CompletionItemKind.Snippet,
-        detail = ("Wrap last %d operand(s)"):format(n),
+        detail = ("Wrap last %d operand(s)"):format(distance),
         insertTextFormat = 1,
         filterText = trigger,
         sortText = string.format("%02d", n),
@@ -140,7 +179,7 @@ function M.setup()
             start = { line = params.context.cursor.row - 1, character = 0 },
             ["end"] = { line = params.context.cursor.row - 1, character = #before },
           },
-          newText = wrap_last_n_operands(expr, n),
+          newText = wrap_last_n_operands(expr, distance),
         },
       })
     end
