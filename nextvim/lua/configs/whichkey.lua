@@ -8,9 +8,9 @@ wk.setup({
     registers = true,
     spelling = { enabled = true, suggestions = 20 },
   },
-  -- Ensure both <leader> and backslash mappings are discoverable.
+  -- Keep discovery on leader and window-management backslash maps.
   triggers = {
     { "<leader>", mode = { "n", "v" } },
-    { "\\", mode = { "n", "v" } },
+    { "\\", mode = { "n" } },
   },
 })
