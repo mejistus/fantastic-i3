@@ -1,7 +1,50 @@
 local map = vim.keymap.set
 
+local function ts_fold_range()
+  local ok, node = pcall(vim.treesitter.get_node, { ignore_injections = false })
+  if not ok or not node then
+    return nil, nil
+  end
+  local targets = {
+    function_declaration = true,
+    function_definition = true,
+    method_definition = true,
+    class_definition = true,
+    if_statement = true,
+    for_statement = true,
+    while_statement = true,
+    try_statement = true,
+    with_statement = true,
+  }
+  while node do
+    if targets[node:type()] then
+      local srow, _, erow, _ = node:range()
+      if erow > srow then
+        return srow + 1, erow + 1
+      end
+    end
+    node = node:parent()
+  end
+  return nil, nil
+end
+
+local function smart_close_fold()
+  pcall(vim.cmd, "normal! zc")
+  if vim.fn.foldclosed(vim.fn.line(".")) ~= -1 then
+    return
+  end
+  local sline, eline = ts_fold_range()
+  if not sline or not eline then
+    vim.notify("No fold", vim.log.levels.INFO)
+    return
+  end
+  vim.cmd(string.format("%d,%dfold", sline, eline))
+  pcall(vim.cmd, "normal! zc")
+end
+
 map("n", ";;", "<cmd>noh<CR>", { desc = "clear highlights" })
 map("n", "F", vim.lsp.buf.hover, { desc = "lsp hover" })
+map("n", "zc", smart_close_fold, { desc = "smart close fold" })
 -- Backslash prefix: window management.
 map("n", "\\v", "<cmd>vsplit<CR>", { desc = "window split vertical" })
 map("n", "\\s", "<cmd>split<CR>", { desc = "window split horizontal" })
@@ -52,7 +95,6 @@ map("v", "<leader>/", "gc", { desc = "comment toggle", remap = true })
 map("n", "<leader>fw", "<cmd>Telescope live_grep<CR>", { desc = "live grep" })
 map("n", "<leader>fb", "<cmd>Telescope buffers<CR>", { desc = "find buffers" })
 map("n", "<leader>tg", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "document symbols" })
-map("n", "<leader>ma", "<cmd>Telescope marks<CR>", { desc = "find marks" })
 map("n", "<leader>fo", "<cmd>Telescope oldfiles<CR>", { desc = "old files" })
 map("n", "<leader>fz", "<cmd>Telescope current_buffer_fuzzy_find<CR>", { desc = "buffer fuzzy find" })
 map("n", "<leader>cm", "<cmd>Telescope git_commits<CR>", { desc = "git commits" })
@@ -202,6 +244,351 @@ map("n", "<leader>lty", "<cmd>Telescope lsp_type_definitions<CR>", { desc = "typ
 map("n", "<leader>lip", "<cmd>Telescope lsp_implementations<CR>", { desc = "implementations" })
 map("n", "<leader>lic", "<cmd>Telescope lsp_incoming_calls<CR>", { desc = "incoming calls" })
 map("n", "<leader>loc", "<cmd>Telescope lsp_outgoing_calls<CR>", { desc = "outgoing calls" })
+-- Extra short LSP mappings.
+map("n", "gd", vim.lsp.buf.definition, { desc = "goto definition" })
+map("n", "gD", vim.lsp.buf.declaration, { desc = "goto declaration" })
+map("n", "gr", vim.lsp.buf.references, { desc = "goto references" })
+map("n", "gi", vim.lsp.buf.implementation, { desc = "goto implementation" })
+map("n", "gt", vim.lsp.buf.type_definition, { desc = "goto type definition" })
+
+-- Persistent bookmarks: add/delete/list-jump/toggle/next/prev.
+vim.fn.sign_define("UserBookmarkSign", { text = "●", texthl = "DiagnosticHint" })
+local bookmark_file = vim.fn.stdpath("data") .. "/bookmarks.json"
+local bookmarks = {} -- [abs_path] = { [line] = true }
+
+local function normalize_path(path)
+  if not path or path == "" then
+    return nil
+  end
+  return vim.fn.fnamemodify(path, ":p")
+end
+
+local function save_bookmarks()
+  local serializable = {}
+  for path, lines in pairs(bookmarks) do
+    local arr = {}
+    for line, marked in pairs(lines) do
+      if marked then
+        table.insert(arr, line)
+      end
+    end
+    table.sort(arr)
+    if #arr > 0 then
+      serializable[path] = arr
+    end
+  end
+  vim.fn.mkdir(vim.fn.fnamemodify(bookmark_file, ":h"), "p")
+  vim.fn.writefile({ vim.json.encode(serializable) }, bookmark_file)
+end
+
+local function load_bookmarks()
+  local ok, content = pcall(vim.fn.readfile, bookmark_file)
+  if not ok or not content or #content == 0 then
+    return
+  end
+  local data_ok, data = pcall(vim.json.decode, table.concat(content, "\n"))
+  if not data_ok or type(data) ~= "table" then
+    return
+  end
+  for path, lines in pairs(data) do
+    local abs = normalize_path(path)
+    if abs and type(lines) == "table" then
+      bookmarks[abs] = {}
+      for _, line in ipairs(lines) do
+        local n = tonumber(line)
+        if n and n > 0 then
+          bookmarks[abs][n] = true
+        end
+      end
+    end
+  end
+end
+
+local function sign_id(bufnr, line)
+  return bufnr * 100000 + line
+end
+
+local function sync_signs_for_buf(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+  vim.fn.sign_unplace("user_bookmarks", { buffer = bufnr })
+  if not path or not bookmarks[path] then
+    return
+  end
+  for line, marked in pairs(bookmarks[path]) do
+    if marked then
+      vim.fn.sign_place(sign_id(bufnr, line), "user_bookmarks", "UserBookmarkSign", bufnr, { lnum = line, priority = 20 })
+    end
+  end
+end
+
+local function ensure_bucket(path)
+  if not bookmarks[path] then
+    bookmarks[path] = {}
+  end
+  return bookmarks[path]
+end
+
+local function add_bookmark()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+  if not path then
+    return
+  end
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local bucket = ensure_bucket(path)
+  if bucket[line] then
+    vim.notify("该行已存在书签", vim.log.levels.INFO)
+    return
+  end
+  bucket[line] = true
+  sync_signs_for_buf(bufnr)
+  save_bookmarks()
+  vim.notify("已添加书签", vim.log.levels.INFO)
+end
+
+local function delete_bookmark()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+  if not path then
+    return
+  end
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local bucket = ensure_bucket(path)
+  if not bucket[line] then
+    vim.notify("当前行没有书签", vim.log.levels.INFO)
+    return
+  end
+  bucket[line] = nil
+  if vim.tbl_isempty(bucket) then
+    bookmarks[path] = nil
+  end
+  sync_signs_for_buf(bufnr)
+  save_bookmarks()
+  vim.notify("已删除书签", vim.log.levels.INFO)
+end
+
+local function file_line_text(path, line)
+  local bufnr = vim.fn.bufnr(path, false)
+  if bufnr > 0 and vim.api.nvim_buf_is_loaded(bufnr) then
+    return (vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or "")
+  end
+  if vim.fn.filereadable(path) == 1 then
+    local lines = vim.fn.readfile(path)
+    return lines[line] or ""
+  end
+  return ""
+end
+
+local function list_bookmarks()
+  local items = {}
+  for path, bucket in pairs(bookmarks) do
+    for line, marked in pairs(bucket) do
+      if marked then
+        local text = file_line_text(path, line)
+        table.insert(items, {
+          path = path,
+          line = line,
+          label = string.format("%s:%d  %s", vim.fn.fnamemodify(path, ":~:."), line, vim.trim(text)),
+        })
+      end
+    end
+  end
+  if #items == 0 then
+    vim.notify("暂无书签", vim.log.levels.INFO)
+    return
+  end
+
+  table.sort(items, function(a, b)
+    if a.path == b.path then
+      return a.line < b.line
+    end
+    return a.path < b.path
+  end)
+
+  local has_telescope, pickers = pcall(require, "telescope.pickers")
+  if has_telescope then
+    local finders = require("telescope.finders")
+    local conf = require("telescope.config").values
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+    local action_set = require("telescope.actions.set")
+
+    pickers
+      .new({}, {
+        prompt_title = "Bookmarks",
+        layout_strategy = "horizontal",
+        sorting_strategy = "ascending",
+        previewer = true,
+        preview_cutoff = 0,
+        layout_config = {
+          width = 0.95,
+          height = 0.9,
+          prompt_position = "top",
+          horizontal = { preview_width = 0.55 },
+        },
+        finder = finders.new_table({
+          results = items,
+          entry_maker = function(item)
+            return {
+              value = item,
+              display = item.label,
+              ordinal = item.label,
+              filename = item.path,
+              lnum = item.line,
+              col = 1,
+            }
+          end,
+        }),
+        sorter = conf.generic_sorter({}),
+        previewer = conf.grep_previewer({}),
+        attach_mappings = function(prompt_bufnr, _)
+          local function safe_select_or_close()
+            local ok, selection = pcall(action_state.get_selected_entry)
+            if not ok or not selection or not selection.value then
+              actions.close(prompt_bufnr)
+              return
+            end
+            actions.close(prompt_bufnr)
+            local choice = selection.value
+            vim.cmd("edit " .. vim.fn.fnameescape(choice.path))
+            vim.api.nvim_win_set_cursor(0, { choice.line, 0 })
+          end
+
+          actions.select_default:replace(function()
+            safe_select_or_close()
+          end)
+          action_set.select:replace(function()
+            safe_select_or_close()
+          end)
+          return true
+        end,
+      })
+      :find()
+    return
+  end
+
+  vim.ui.select(items, {
+    prompt = "跳转书签",
+    format_item = function(item)
+      return item.label
+    end,
+  }, function(choice)
+    if not choice then
+      return
+    end
+    vim.cmd("edit " .. vim.fn.fnameescape(choice.path))
+    vim.api.nvim_win_set_cursor(0, { choice.line, 0 })
+  end)
+end
+
+local function collect_sorted_bookmarks()
+  local items = {}
+  for path, bucket in pairs(bookmarks) do
+    for line, marked in pairs(bucket) do
+      if marked then
+        table.insert(items, { path = path, line = line })
+      end
+    end
+  end
+  table.sort(items, function(a, b)
+    if a.path == b.path then
+      return a.line < b.line
+    end
+    return a.path < b.path
+  end)
+  return items
+end
+
+local function goto_bookmark(item)
+  if not item then
+    return
+  end
+  vim.cmd("edit " .. vim.fn.fnameescape(item.path))
+  vim.api.nvim_win_set_cursor(0, { item.line, 0 })
+end
+
+local function toggle_bookmark()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
+  if not path then
+    return
+  end
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local bucket = ensure_bucket(path)
+  if bucket[line] then
+    delete_bookmark()
+  else
+    add_bookmark()
+  end
+end
+
+local function jump_bookmark(direction)
+  local items = collect_sorted_bookmarks()
+  if #items == 0 then
+    vim.notify("暂无书签", vim.log.levels.INFO)
+    return
+  end
+  local cur_path = normalize_path(vim.api.nvim_buf_get_name(0)) or ""
+  local cur_line = vim.api.nvim_win_get_cursor(0)[1]
+  local index = nil
+  for i, item in ipairs(items) do
+    if item.path == cur_path and item.line == cur_line then
+      index = i
+      break
+    end
+  end
+
+  local target
+  if direction > 0 then
+    if index then
+      target = items[(index % #items) + 1]
+    else
+      target = items[1]
+      for _, item in ipairs(items) do
+        if item.path > cur_path or (item.path == cur_path and item.line > cur_line) then
+          target = item
+          break
+        end
+      end
+    end
+  else
+    if index then
+      target = items[((index - 2 + #items) % #items) + 1]
+    else
+      target = items[#items]
+      for i = #items, 1, -1 do
+        local item = items[i]
+        if item.path < cur_path or (item.path == cur_path and item.line < cur_line) then
+          target = item
+          break
+        end
+      end
+    end
+  end
+  goto_bookmark(target)
+end
+
+load_bookmarks()
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufWinEnter" }, {
+  group = vim.api.nvim_create_augroup("UserBookmarkSigns", { clear = true }),
+  callback = function(args)
+    sync_signs_for_buf(args.buf)
+  end,
+})
+
+map("n", "<leader>ma", add_bookmark, { desc = "bookmark add current line" })
+map("n", "<leader>md", delete_bookmark, { desc = "bookmark delete current line" })
+map("n", "<leader>mm", list_bookmarks, { desc = "bookmark list and jump" })
+map("n", "mA", toggle_bookmark, { desc = "bookmark toggle current line" })
+map("n", "m]", function()
+  jump_bookmark(1)
+end, { desc = "bookmark next" })
+map("n", "m[", function()
+  jump_bookmark(-1)
+end, { desc = "bookmark prev" })
 
 map("n", "<space><Tab>", function()
   if vim.bo.filetype == "oil" then

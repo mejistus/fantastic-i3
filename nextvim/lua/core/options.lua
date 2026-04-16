@@ -33,5 +33,12 @@ o.termguicolors = true
 o.showtabline = 2
 o.foldenable = true
 o.foldmethod = "expr"
+if vim.treesitter and vim.treesitter.foldexpr then
+  o.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+else
+  o.foldexpr = "nvim_treesitter#foldexpr()"
+end
 o.foldlevel = 99
+o.foldlevelstart = 99
+o.viewoptions = "folds,cursor,curdir,slash,unix"
 o.conceallevel = 1
