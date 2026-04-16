@@ -1,7 +1,6 @@
 local cmp = require("cmp")
 local luasnip = require("luasnip")
 local paren_wrap = require("configs.cmp_paren")
-paren_wrap.setup()
 
 require("codeium").setup({
   enable_cmp_source = true,
@@ -14,6 +13,11 @@ require("codeium").setup({
 })
 
 cmp.setup({
+  formatting = {
+    format = function(entry, vim_item)
+      return vim_item
+    end,
+  },
   completion = {
     autocomplete = { require("cmp.types").cmp.TriggerEvent.TextChanged },
     keyword_length = 1,
@@ -48,12 +52,12 @@ cmp.setup({
       local before = line:sub(1, col)
       local expanded = (vim.bo.filetype == "python") and paren_wrap.expand_inline(before) or nil
 
-      if cmp.visible() then
-        cmp.select_next_item()
-      elseif expanded then
+      if expanded then
         vim.api.nvim_set_current_line(expanded .. line:sub(col + 1))
         vim.api.nvim_win_set_cursor(0, { row, #expanded })
         return
+      elseif cmp.visible() then
+        cmp.select_next_item()
       elseif luasnip.expand_or_locally_jumpable() then
         luasnip.expand_or_jump()
       else
@@ -71,11 +75,6 @@ cmp.setup({
     end, { "i", "s" }),
   },
   sources = cmp.config.sources({
-    {
-      name = "paren_wrap",
-      priority = 1200,
-      keyword_pattern = [[\.[)]\+]],
-    },
     { name = "nvim_lsp" },
     {
       name = "luasnip",
