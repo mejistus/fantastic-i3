@@ -2,6 +2,9 @@ local cmp = require("cmp")
 local luasnip = require("luasnip")
 local paren_wrap = require("configs.cmp_paren")
 
+-- Register the paren_wrap source!
+paren_wrap.setup()
+
 require("codeium").setup({
   enable_cmp_source = true,
   virtual_text = {
@@ -37,30 +40,12 @@ cmp.setup({
         cmp.confirm({ select = true })
         return
       end
-      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-      local line = vim.api.nvim_get_current_line()
-      local before = line:sub(1, col)
-      local expanded = (vim.bo.filetype == "python") and paren_wrap.expand_inline(before) or nil
-      if expanded then
-        vim.api.nvim_set_current_line(expanded .. line:sub(col + 1))
-        vim.api.nvim_win_set_cursor(0, { row, #expanded })
-        return
-      end
       fallback()
     end, { "i", "s" }),
     ["<Up>"] = cmp.mapping.select_prev_item(),
     ["<Down>"] = cmp.mapping.select_next_item(),
     ["<Tab>"] = cmp.mapping(function(fallback)
-      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-      local line = vim.api.nvim_get_current_line()
-      local before = line:sub(1, col)
-      local expanded = (vim.bo.filetype == "python") and paren_wrap.expand_inline(before) or nil
-
-      if expanded then
-        vim.api.nvim_set_current_line(expanded .. line:sub(col + 1))
-        vim.api.nvim_win_set_cursor(0, { row, #expanded })
-        return
-      elseif cmp.visible() then
+      if cmp.visible() then
         cmp.select_next_item()
       elseif luasnip.expand_or_locally_jumpable() then
         luasnip.expand_or_jump()
@@ -79,6 +64,7 @@ cmp.setup({
     end, { "i", "s" }),
   },
   sources = cmp.config.sources({
+    { name = "paren_wrap" },
     { name = "nvim_lsp" },
     {
       name = "luasnip",

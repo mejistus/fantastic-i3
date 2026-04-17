@@ -50,10 +50,11 @@ local lang_fallback_bold_groups = {
 
 local function set_group_style(group, style)
   local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
-  if ok and hl then
+  -- If hl is empty, the group is undefined (relies on treesitter fallback).
+  -- We shouldn't define it explicitly with just bold/italic, as it would break
+  -- the fallback chain and cause the text to lose its original colors.
+  if ok and hl and not vim.tbl_isempty(hl) then
     vim.api.nvim_set_hl(0, group, vim.tbl_extend("force", hl, style))
-  else
-    vim.api.nvim_set_hl(0, group, style)
   end
 end
 
