@@ -2,7 +2,7 @@ local cmp = require("cmp")
 local luasnip = require("luasnip")
 local paren_wrap = require("configs.cmp_paren")
 
--- Register the paren_wrap source!
+-- Set up suffix-style bracket completion (e.g. a+b+c.) => a+b+(c))
 paren_wrap.setup()
 
 require("codeium").setup({
@@ -36,6 +36,10 @@ cmp.setup({
     ["<C-f>"] = cmp.mapping.scroll_docs(4),
     ["<C-Space>"] = cmp.mapping.complete(),
     ["<CR>"] = cmp.mapping(function(fallback)
+      if paren_wrap.is_active() then
+        paren_wrap.confirm()
+        return
+      end
       if cmp.visible() then
         cmp.confirm({ select = true })
         return
@@ -64,7 +68,6 @@ cmp.setup({
     end, { "i", "s" }),
   },
   sources = cmp.config.sources({
-    { name = "paren_wrap" },
     { name = "nvim_lsp" },
     {
       name = "luasnip",

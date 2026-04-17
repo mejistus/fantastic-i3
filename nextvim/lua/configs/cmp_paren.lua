@@ -2,10 +2,22 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace("paren_wrap_preview")
 
+-- Active preview state
+M._state = nil -- { bufnr, row, original_line, preview_line, cursor_col }
+
+local bracket_pairs = {
+  [")"] = { open = "(", close = ")" },
+  ["]"] = { open = "[", close = "]" },
+  ["}"] = { open = "{", close = "}" },
+}
+
 local function trim(str)
   return (str:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+--- Collect top-level operator positions in an expression.
+--- Handles nested brackets, string literals, and unmatched openers.
+--- Returns a list of merged operator spans: { start_col, end_col }
 local function collect_top_level_ops(expr)
   local ops = {}
   local i = 1
@@ -67,6 +79,9 @@ local function collect_top_level_ops(expr)
     end
   end
 
+  -- Use the final nesting depth as the "base" level.
+  -- When there are unmatched openers (e.g. "func(a+b+c"), we treat the
+  -- content after the last opener as the expression to operate on.
   local base_depth = depth
   local filtered = {}
 
@@ -85,6 +100,7 @@ local function collect_top_level_ops(expr)
     return a.end_col < b.end_col
   end)
 
+  -- Merge adjacent/overlapping operator spans (e.g. "a + b" has space+plus+space)
   local merged = {}
   for _, op in ipairs(filtered) do
     if #merged == 0 then
@@ -102,7 +118,8 @@ local function collect_top_level_ops(expr)
   return merged
 end
 
-local function wrap_last_n_operands(expr, n)
+--- Wrap the last N operands with the given bracket pair.
+local function wrap_last_n_operands(expr, n, pair)
   local source = trim(expr)
   if source == "" then
     return source
@@ -113,61 +130,68 @@ local function wrap_last_n_operands(expr, n)
   local operand_count = operator_count + 1
 
   if operator_count == 0 or n >= operand_count then
-    return "(" .. source .. ")"
+    return pair.open .. source .. pair.close
   end
 
   local boundary_op = ops[operator_count - n + 1]
   local left = source:sub(1, boundary_op.end_col)
-  local right = source:sub(boundary_op.end_col + 1)
-  return left .. "(" .. trim(right) .. ")"
+  local right = trim(source:sub(boundary_op.end_col + 1))
+  return left .. pair.open .. right .. pair.close
 end
 
-local function effective_distance(expr, typed_count)
-  local source = trim(expr)
-  if typed_count > 1 and source:sub(-1) == ")" then
-    return typed_count - 1
+--- Parse the suffix trigger pattern from text before the cursor.
+--- Matches: <expression> . <one-or-more-identical-closing-brackets>
+--- Returns: expr, bracket_count, bracket_pair  OR  nil, nil, nil
+local function parse_suffix(before_cursor)
+  local expr, dot_brackets = before_cursor:match("^(.-)(%.[%)%]%}]+)$")
+  if not expr or not dot_brackets then
+    return nil, nil, nil
   end
-  return typed_count
-end
 
-local function parse_suffix_at_end(before_line)
-  local expr, parens = before_line:match("^(.-)%.([)]*)$")
-  if not expr or parens == nil then
-    return nil, nil
+  local brackets = dot_brackets:sub(2) -- strip the leading dot
+  local first = brackets:sub(1, 1)
+
+  -- All closing brackets must be the same type
+  for i = 2, #brackets do
+    if brackets:sub(i, i) ~= first then
+      return nil, nil, nil
+    end
   end
-  return expr, #parens
-end
 
-local function get_expanded_before(before_line)
-  local expr, count = parse_suffix_at_end(before_line)
-  if not expr or trim(expr) == "" then
-    return nil
+  local pair = bracket_pairs[first]
+  if not pair then
+    return nil, nil, nil
   end
-  local typed = math.max(count, 1)
-  return wrap_last_n_operands(expr, effective_distance(expr, typed))
+
+  if trim(expr) == "" then
+    return nil, nil, nil
+  end
+
+  return expr, #brackets, pair
 end
 
-function M.expand_inline(before_line)
-  return get_expanded_before(before_line)
-end
-
-function M.has_suffix_at_end(before_line)
-  local expr, count = parse_suffix_at_end(before_line)
-  return expr ~= nil and count ~= nil and trim(expr) ~= ""
-end
-
+--- Compute the preview for a full line given the cursor column (0-indexed byte offset).
+--- Returns: preview_line, cursor_col_for_confirm  OR  nil, nil
 function M.preview_line(line, col)
   local before = line:sub(1, col)
   local after = line:sub(col + 1)
-  local expanded = get_expanded_before(before)
-  if not expanded then
-    return nil
+
+  local expr, count, pair = parse_suffix(before)
+  if not expr then
+    return nil, nil
   end
-  return expanded .. after
+
+  local wrapped = wrap_last_n_operands(expr, count, pair)
+  return wrapped .. after, #wrapped
+end
+
+function M.is_active()
+  return M._state ~= nil
 end
 
 function M.clear_preview(bufnr)
-  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  vim.api.nvim_buf_clear_namespace(bufnr or 0, ns, 0, -1)
+  M._state = nil
 end
 
 function M.refresh_preview(bufnr)
@@ -177,10 +201,6 @@ function M.refresh_preview(bufnr)
   end
 
   M.clear_preview(bufnr)
-
-  if vim.bo[bufnr].filetype ~= "python" then
-    return
-  end
 
   if vim.api.nvim_get_current_buf() ~= bufnr then
     return
@@ -193,16 +213,53 @@ function M.refresh_preview(bufnr)
 
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   local line = vim.api.nvim_get_current_line()
-  local preview = M.preview_line(line, col)
+  local preview, cursor_col = M.preview_line(line, col)
   if not preview or preview == line then
     return
   end
 
-  vim.api.nvim_buf_set_extmark(bufnr, ns, row - 1, col, {
-    virt_text = { { " => " .. preview, "Comment" } },
-    virt_text_pos = "eol",
-    hl_mode = "combine",
+  -- Overlay the preview on top of the actual buffer line.
+  -- Pad with spaces so the overlay fully covers the original text.
+  local display = preview
+  if #preview < #line then
+    display = preview .. string.rep(" ", #line - #preview)
+  end
+
+  vim.api.nvim_buf_set_extmark(bufnr, ns, row - 1, 0, {
+    virt_text = { { display, "Comment" } },
+    virt_text_pos = "overlay",
+    priority = 1000,
   })
+
+  M._state = {
+    bufnr = bufnr,
+    row = row,
+    original_line = line,
+    preview_line = preview,
+    cursor_col = cursor_col,
+  }
+end
+
+--- Confirm the preview: replace the buffer line and position cursor after the closing bracket.
+--- Returns true if a preview was confirmed, false otherwise.
+function M.confirm()
+  if not M._state then
+    return false
+  end
+
+  local s = M._state
+  if not vim.api.nvim_buf_is_valid(s.bufnr) then
+    M._state = nil
+    return false
+  end
+
+  -- Replace the line with the computed preview
+  vim.api.nvim_buf_set_lines(s.bufnr, s.row - 1, s.row, false, { s.preview_line })
+  -- Place cursor right after the closing bracket
+  vim.api.nvim_win_set_cursor(0, { s.row, s.cursor_col })
+
+  M.clear_preview(s.bufnr)
+  return true
 end
 
 function M.setup()
@@ -233,5 +290,10 @@ function M.setup()
     end,
   })
 end
+
+-- Expose internals for testing
+M._parse_suffix = parse_suffix
+M._wrap_last_n_operands = wrap_last_n_operands
+M._collect_top_level_ops = collect_top_level_ops
 
 return M
