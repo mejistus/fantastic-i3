@@ -1,5 +1,7 @@
 local M = {}
 
+local ns = vim.api.nvim_create_namespace("paren_wrap_preview")
+
 local function trim(str)
   return (str:gsub("^%s+", ""):gsub("%s+$", ""))
 end
@@ -10,7 +12,12 @@ local function collect_top_level_ops(expr)
   local depth = 0
   local in_single = false
   local in_double = false
-  local op_tokens = { "//", "**", "<<", ">>", "+", "-", "*", "/", "%", "|", "&", "^" }
+  local op_tokens = {
+    "//", "**", "<<", ">>", "==", "!=", "<=", ">=",
+    "+", "-", "*", "/", "%", "|", "&", "^",
+    "=", ",", ":", " ",
+  }
+  local unmatched_openers = {}
 
   while i <= #expr do
     local ch = expr:sub(i, i)
@@ -34,16 +41,20 @@ local function collect_top_level_ops(expr)
         in_double = true
         i = i + 1
       elseif ch == "(" or ch == "[" or ch == "{" then
+        table.insert(unmatched_openers, i)
         depth = depth + 1
         i = i + 1
       elseif ch == ")" or ch == "]" or ch == "}" then
+        if #unmatched_openers > 0 then
+          table.remove(unmatched_openers)
+        end
         depth = math.max(depth - 1, 0)
         i = i + 1
       else
         local matched = false
         for _, op in ipairs(op_tokens) do
           if expr:sub(i, i + #op - 1) == op then
-            table.insert(ops, { end_col = i + #op - 1, depth = depth })
+            table.insert(ops, { start_col = i, end_col = i + #op - 1, depth = depth })
             i = i + #op
             matched = true
             break
@@ -58,12 +69,37 @@ local function collect_top_level_ops(expr)
 
   local base_depth = depth
   local filtered = {}
+
+  if base_depth > 0 and #unmatched_openers > 0 then
+    local opener_idx = unmatched_openers[#unmatched_openers]
+    table.insert(filtered, { start_col = opener_idx, end_col = opener_idx })
+  end
+
   for _, op in ipairs(ops) do
     if op.depth == base_depth then
-      table.insert(filtered, { end_col = op.end_col })
+      table.insert(filtered, { start_col = op.start_col, end_col = op.end_col })
     end
   end
-  return filtered
+
+  table.sort(filtered, function(a, b)
+    return a.end_col < b.end_col
+  end)
+
+  local merged = {}
+  for _, op in ipairs(filtered) do
+    if #merged == 0 then
+      table.insert(merged, op)
+    else
+      local last = merged[#merged]
+      if op.start_col <= last.end_col + 1 then
+        merged[#merged].end_col = math.max(last.end_col, op.end_col)
+      else
+        table.insert(merged, op)
+      end
+    end
+  end
+
+  return merged
 end
 
 local function wrap_last_n_operands(expr, n)
@@ -81,9 +117,9 @@ local function wrap_last_n_operands(expr, n)
   end
 
   local boundary_op = ops[operator_count - n + 1]
-  local left = trim(source:sub(1, boundary_op.end_col))
-  local right = trim(source:sub(boundary_op.end_col + 1))
-  return left .. "(" .. right .. ")"
+  local left = source:sub(1, boundary_op.end_col)
+  local right = source:sub(boundary_op.end_col + 1)
+  return left .. "(" .. trim(right) .. ")"
 end
 
 local function effective_distance(expr, typed_count)
@@ -97,36 +133,22 @@ end
 local function parse_suffix_at_end(before_line)
   local expr, parens = before_line:match("^(.-)%.([)]*)$")
   if not expr or parens == nil then
-    return nil, nil, nil
+    return nil, nil
   end
-  return expr, #parens, ""
+  return expr, #parens
 end
 
-local function parse_suffix_anywhere(before_line)
-  local expr, parens, tail = before_line:match("^(.*)%.([)]*)(.*)$")
-  if not expr or parens == nil then
-    return nil, nil, nil
-  end
-  -- Prevent accidental expansion on `a. ` / `a.\t` etc.
-  -- Empty paren suffix is only valid when cursor is exactly after dot.
-  if parens == "" and tail ~= "" then
-    return nil, nil, nil
-  end
-  return expr, #parens, tail or ""
-end
-
-function M.expand_inline(before_line)
-  -- Expand only when cursor is immediately after suffix token.
-  -- This avoids accidental expansion like `1.) <Enter>`.
+local function get_expanded_before(before_line)
   local expr, count = parse_suffix_at_end(before_line)
-  if not expr then
+  if not expr or trim(expr) == "" then
     return nil
   end
   local typed = math.max(count, 1)
-  if trim(expr) == "" then
-    return nil
-  end
   return wrap_last_n_operands(expr, effective_distance(expr, typed))
+end
+
+function M.expand_inline(before_line)
+  return get_expanded_before(before_line)
 end
 
 function M.has_suffix_at_end(before_line)
@@ -134,60 +156,82 @@ function M.has_suffix_at_end(before_line)
   return expr ~= nil and count ~= nil and trim(expr) ~= ""
 end
 
+function M.preview_line(line, col)
+  local before = line:sub(1, col)
+  local after = line:sub(col + 1)
+  local expanded = get_expanded_before(before)
+  if not expanded then
+    return nil
+  end
+  return expanded .. after
+end
+
+function M.clear_preview(bufnr)
+  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+end
+
+function M.refresh_preview(bufnr)
+  bufnr = bufnr == 0 and vim.api.nvim_get_current_buf() or bufnr
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  M.clear_preview(bufnr)
+
+  if vim.bo[bufnr].filetype ~= "python" then
+    return
+  end
+
+  if vim.api.nvim_get_current_buf() ~= bufnr then
+    return
+  end
+
+  local mode = vim.api.nvim_get_mode().mode
+  if not mode:match("^[iR]") then
+    return
+  end
+
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local line = vim.api.nvim_get_current_line()
+  local preview = M.preview_line(line, col)
+  if not preview or preview == line then
+    return
+  end
+
+  vim.api.nvim_buf_set_extmark(bufnr, ns, row - 1, col, {
+    virt_text = { { " => " .. preview, "Comment" } },
+    virt_text_pos = "eol",
+    hl_mode = "combine",
+  })
+end
+
 function M.setup()
-  local cmp = require("cmp")
-  local source = {}
-  source.new = function()
-    return setmetatable({}, { __index = source })
+  if M._did_setup then
+    return
   end
+  M._did_setup = true
 
-  function source:is_available()
-    return vim.bo.filetype == "python"
-  end
+  local aug = vim.api.nvim_create_augroup("ParenWrapPreview", { clear = true })
 
-  function source:get_trigger_characters()
-    return { ".", ")" }
-  end
+  vim.api.nvim_create_autocmd({ "TextChangedI", "TextChangedP", "CursorMovedI" }, {
+    group = aug,
+    callback = function(args)
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(args.buf) then
+          M.refresh_preview(args.buf)
+        end
+      end)
+    end,
+  })
 
-  function source:get_keyword_pattern()
-    -- Match suffix token like `.`, `.)`, `.))`, `.)))`.
-    return [[\.[)]*]]
-  end
-
-  function source:complete(params, callback)
-    local before = params.context.cursor_before_line
-    local expr, typed_count = parse_suffix_at_end(before)
-    if not expr then
-      callback({ items = {}, isIncomplete = false })
-      return
-    end
-
-    local items = {}
-    local start_n = math.max(typed_count, 1)
-    for n = start_n, 5 do
-      local trigger = "." .. string.rep(")", n)
-      local distance = effective_distance(expr, n)
-      table.insert(items, {
-        label = trigger,
-        kind = cmp.lsp.CompletionItemKind.Snippet,
-        detail = ("Wrap last %d operand(s)"):format(distance),
-        insertTextFormat = 1,
-        filterText = trigger,
-        sortText = string.format("%02d", n),
-        textEdit = {
-          range = {
-            start = { line = params.context.cursor.row - 1, character = 0 },
-            ["end"] = { line = params.context.cursor.row - 1, character = #before },
-          },
-          newText = wrap_last_n_operands(expr, distance),
-        },
-      })
-    end
-
-    callback({ items = items, isIncomplete = false })
-  end
-
-  cmp.register_source("paren_wrap", source.new())
+  vim.api.nvim_create_autocmd({ "InsertLeave", "BufLeave" }, {
+    group = aug,
+    callback = function(args)
+      if vim.api.nvim_buf_is_valid(args.buf) then
+        M.clear_preview(args.buf)
+      end
+    end,
+  })
 end
 
 return M
