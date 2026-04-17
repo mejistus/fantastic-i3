@@ -1,5 +1,14 @@
 return {
-  { "folke/tokyonight.nvim", lazy = false, priority = 1000, config = function() vim.cmd.colorscheme("tokyonight") end },
+  {
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
+  },
+  { "catppuccin/nvim", name = "catppuccin", lazy = false, priority = 900 },
+  { "ellisonleao/gruvbox.nvim", lazy = false, priority = 900 },
+  { "rebelot/kanagawa.nvim", lazy = false, priority = 900 },
+  { "rose-pine/neovim", name = "rose-pine", lazy = false, priority = 900 },
+  { "EdenEast/nightfox.nvim", lazy = false, priority = 900 },
   {
     "vhyrro/luarocks.nvim",
     priority = 1001,
@@ -96,6 +105,14 @@ return {
     "hrsh7th/nvim-cmp",
     event = "InsertEnter",
     dependencies = {
+      {
+        "windwp/nvim-autopairs",
+        event = "InsertEnter",
+        opts = {
+          check_ts = true,
+          disable_filetype = { "TelescopePrompt" },
+        },
+      },
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-buffer",
       "hrsh7th/cmp-path",

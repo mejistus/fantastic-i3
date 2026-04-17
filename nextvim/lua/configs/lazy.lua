@@ -1,7 +1,7 @@
 return {
   defaults = { lazy = true },
   lockfile = vim.fn.stdpath("data") .. "/lazy-lock.json",
-  install = { colorscheme = { "tokyonight", "habamax" } },
+  install = { colorscheme = { "tokyonight", "catppuccin", "kanagawa", "gruvbox", "rose-pine", "nightfox", "habamax" } },
   ui = {
     icons = {
       ft = "",

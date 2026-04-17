@@ -150,49 +150,90 @@ map("n", "<leader>wk", function()
   vim.cmd("WhichKey " .. vim.fn.input("WhichKey: "))
 end, { desc = "whichkey query lookup" })
 
-local function add_symbols_around_selection(left_symbol, right_symbol)
-  local start_pos = vim.fn.getpos("'<")
-  local end_pos = vim.fn.getpos("'>")
-  local line = vim.fn.getline(start_pos[2])
-  local before = string.sub(line, 1, start_pos[3] - 1)
-  local selected_text = string.sub(line, start_pos[3], end_pos[3])
-  local after = string.sub(line, end_pos[3] + 1)
-  local trimmed_text = selected_text:match("^%s*(.-)%s*$")
-  vim.fn.setline(start_pos[2], before .. left_symbol .. trimmed_text .. right_symbol .. after)
-end
-
-local function remove_pairs()
-  local start_pos = vim.fn.getpos("'<")
-  local end_pos = vim.fn.getpos("'>")
-  local line = vim.fn.getline(start_pos[2])
-  local before = string.sub(line, 1, start_pos[3] - 1)
-  local selected_text = string.sub(line, start_pos[3], end_pos[3])
-  local after = string.sub(line, end_pos[3] + 1)
-  local trimmed_text = selected_text:match("^%s*(.-)%s*$")
-  if #trimmed_text >= 2 then
-    trimmed_text = string.sub(trimmed_text, 2, #trimmed_text - 1)
+local function get_visual_range()
+  local s = vim.fn.getpos("'<")
+  local e = vim.fn.getpos("'>")
+  local srow, scol = s[2], s[3]
+  local erow, ecol = e[2], e[3]
+  if srow > erow or (srow == erow and scol > ecol) then
+    srow, erow = erow, srow
+    scol, ecol = ecol, scol
   end
-  vim.fn.setline(start_pos[2], before .. trimmed_text .. after)
+  local mode = vim.fn.visualmode()
+  if mode == "V" then
+    scol = 1
+    ecol = #vim.fn.getline(erow) + 1
+  elseif mode == "\22" then
+    vim.notify("Blockwise visual mode is not supported for pair wrap/unwrap", vim.log.levels.WARN)
+    return nil
+  end
+  return srow - 1, math.max(scol - 1, 0), erow - 1, math.max(ecol, 0)
 end
 
-map("v", "<leader>r'", remove_pairs, { desc = "unwrap selection" })
-map("v", '<leader>r"', remove_pairs, { desc = "unwrap selection" })
-map("v", "<leader>r]", remove_pairs, { desc = "unwrap selection" })
-map("v", "<leader>r}", remove_pairs, { desc = "unwrap selection" })
-map("v", "<leader>r)", remove_pairs, { desc = "unwrap selection" })
-map("v", "<leader>'", function()
+local function get_selected_text()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local srow, scol, erow, ecol = get_visual_range()
+  if srow == nil then
+    return nil
+  end
+  local parts = vim.api.nvim_buf_get_text(bufnr, srow, scol, erow, ecol, {})
+  return table.concat(parts, "\n"), srow, scol, erow, ecol
+end
+
+local function replace_selected_text(new_text, srow, scol, erow, ecol)
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_set_text(bufnr, srow, scol, erow, ecol, vim.split(new_text, "\n", { plain = true }))
+end
+
+local function add_symbols_around_selection(left_symbol, right_symbol)
+  local selected, srow, scol, erow, ecol = get_selected_text()
+  if not selected then
+    return
+  end
+  replace_selected_text(left_symbol .. selected .. right_symbol, srow, scol, erow, ecol)
+end
+
+local function remove_pairs(left_symbol, right_symbol)
+  local selected, srow, scol, erow, ecol = get_selected_text()
+  if not selected then
+    return
+  end
+  if selected:sub(1, #left_symbol) == left_symbol and selected:sub(-#right_symbol) == right_symbol and #selected >= (#left_symbol + #right_symbol) then
+    local unwrapped = selected:sub(#left_symbol + 1, #selected - #right_symbol)
+    replace_selected_text(unwrapped, srow, scol, erow, ecol)
+  else
+    vim.notify("Selection is not wrapped by expected pair", vim.log.levels.INFO)
+  end
+end
+
+map("x", "<leader>r'", function()
+  remove_pairs("'", "'")
+end, { desc = "unwrap '" })
+map("x", '<leader>r"', function()
+  remove_pairs('"', '"')
+end, { desc = 'unwrap "' })
+map("x", "<leader>r]", function()
+  remove_pairs("[", "]")
+end, { desc = "unwrap []" })
+map("x", "<leader>r}", function()
+  remove_pairs("{", "}")
+end, { desc = "unwrap {}" })
+map("x", "<leader>r)", function()
+  remove_pairs("(", ")")
+end, { desc = "unwrap ()" })
+map("x", "<leader>'", function()
   add_symbols_around_selection("'", "'")
 end, { desc = "wrap with quote" })
-map("v", '<leader>"', function()
+map("x", '<leader>"', function()
   add_symbols_around_selection('"', '"')
 end, { desc = "wrap with double quote" })
-map("v", "<leader>]", function()
+map("x", "<leader>]", function()
   add_symbols_around_selection("[", "]")
 end, { desc = "wrap with []" })
-map("v", "<leader>}", function()
+map("x", "<leader>}", function()
   add_symbols_around_selection("{", "}")
 end, { desc = "wrap with {}" })
-map("v", "<leader>)", function()
+map("x", "<leader>)", function()
   add_symbols_around_selection("(", ")")
 end, { desc = "wrap with ()" })
 

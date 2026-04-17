@@ -12,6 +12,11 @@ require("codeium").setup({
   },
 })
 
+local ok_cmp_ap, cmp_autopairs = pcall(require, "nvim-autopairs.completion.cmp")
+if ok_cmp_ap then
+  cmp.event:on("confirm_done", cmp_autopairs.on_confirm_done())
+end
+
 cmp.setup({
   formatting = {
     format = function(entry, vim_item)
@@ -22,7 +27,6 @@ cmp.setup({
     autocomplete = { require("cmp.types").cmp.TriggerEvent.TextChanged },
     keyword_length = 1,
     debounce = 750,
-    keyword_pattern = [[\S+]],
   },
   mapping = {
     ["<C-b>"] = cmp.mapping.scroll_docs(-4),
