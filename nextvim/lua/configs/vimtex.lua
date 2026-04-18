@@ -31,6 +31,10 @@ vim.g.vimtex_compiler_latexmk = {
   },
 }
 
-vim.g.vimtex_view_general_options =
-  '--synctex-forward @line:@col:@pdf --synctex-editor-command "nvim --headless -c \\"VimtexInverseSearch {input} {line}\\""'
-vim.g.vimtex_view_method = "skim"
+if vim.fn.has("mac") == 1 then
+  vim.g.vimtex_view_method = "skim"
+  vim.g.vimtex_view_skim_sync = 1
+  vim.g.vimtex_view_skim_activate = 1
+else
+  vim.g.vimtex_view_method = "zathura"
+end
