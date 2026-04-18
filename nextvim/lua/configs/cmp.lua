@@ -5,15 +5,16 @@ local paren_wrap = require("configs.cmp_paren")
 -- Set up suffix-style bracket completion (e.g. a+b+c.) => a+b+(c))
 paren_wrap.setup()
 
-require("codeium").setup({
-  enable_cmp_source = true,
-  virtual_text = {
-    enabled = true,
-    filetypes = { "python", "tex", "markdown" },
-    default_filetype_enabled = true,
-    idle_delay = 500,
-  },
-})
+-- TODO: codeium disabled due to server crash (nil concat in api.lua:237)
+-- require("codeium").setup({
+--   enable_cmp_source = true,
+--   virtual_text = {
+--     enabled = true,
+--     filetypes = { "python", "tex", "markdown" },
+--     default_filetype_enabled = true,
+--     idle_delay = 500,
+--   },
+-- })
 
 local ok_cmp_ap, cmp_autopairs = pcall(require, "nvim-autopairs.completion.cmp")
 if ok_cmp_ap then
@@ -75,7 +76,7 @@ cmp.setup({
         show_autosnippets = true,
       },
     },
-    { name = "codeium" },
+    -- { name = "codeium" },
     { name = "buffer" },
     { name = "path" },
   }),
