@@ -120,9 +120,10 @@ end
 
 --- Wrap the last N operands with the given bracket pair.
 local function wrap_last_n_operands(expr, n, pair)
+  local leading = expr:match("^(%s*)") or ""
   local source = trim(expr)
   if source == "" then
-    return source
+    return expr
   end
 
   local ops = collect_top_level_ops(source)
@@ -130,13 +131,13 @@ local function wrap_last_n_operands(expr, n, pair)
   local operand_count = operator_count + 1
 
   if operator_count == 0 or n >= operand_count then
-    return pair.open .. source .. pair.close
+    return leading .. pair.open .. source .. pair.close
   end
 
   local boundary_op = ops[operator_count - n + 1]
   local left = source:sub(1, boundary_op.end_col)
   local right = trim(source:sub(boundary_op.end_col + 1))
-  return left .. pair.open .. right .. pair.close
+  return leading .. left .. pair.open .. right .. pair.close
 end
 
 --- Parse the suffix trigger pattern from text before the cursor.
