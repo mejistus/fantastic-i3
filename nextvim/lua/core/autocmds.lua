@@ -34,3 +34,21 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.keymap.set("n", "<leader>lw", "<cmd>VimtexCountWords!<CR>", { buffer = true, silent = true })
   end,
 })
+
+-- Ensure commentstring is set for filetypes that lack it,
+-- so Comment.nvim (gcc/gc) never gets nil.
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = {
+    "conf", "config", "cfg", "ini", "sshconfig", "sshdconfig",
+    "tmux", "fstab", "crontab", "samba", "resolv",
+    "toml", "dosini", "desktop", "xdefaults",
+    "gitconfig", "hgrc",
+    "bash", "zsh", "sh",
+    "i3config", "swayconfig", "hypr",
+  },
+  callback = function()
+    if vim.bo.commentstring == "" or vim.bo.commentstring == nil then
+      vim.bo.commentstring = "# %s"
+    end
+  end,
+})
