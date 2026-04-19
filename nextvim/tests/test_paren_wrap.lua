@@ -332,6 +332,18 @@ test("multiple dots in expression", function()
   eq(col, #"a.x+(b.y)")
 end)
 
+test("indented line preserves leading whitespace", function()
+  local preview, col = paren.preview_line("    1+i+i*i.)", 13)
+  eq(preview, "    1+i+i*(i)")
+  eq(col, 13)
+end)
+
+test("indented line: wrap 2 operands", function()
+  local preview, col = paren.preview_line("        a+b+c.))", 17)
+  eq(preview, "        a+(b+c)")
+  eq(col, 15)
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────
 
 io.write(string.format("\n%d passed, %d failed\n", pass_count, fail_count))
