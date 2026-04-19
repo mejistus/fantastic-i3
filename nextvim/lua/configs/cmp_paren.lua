@@ -170,6 +170,19 @@ local function parse_suffix(before_cursor)
   return expr, #brackets, pair
 end
 
+local function bracket_depth(str, open, close)
+  local d = 0
+  for i = 1, #str do
+    local ch = str:sub(i, i)
+    if ch == open then
+      d = d + 1
+    elseif ch == close then
+      d = d - 1
+    end
+  end
+  return d
+end
+
 --- Compute the preview for a full line given the cursor column (0-indexed byte offset).
 --- Returns: preview_line, cursor_col_for_confirm  OR  nil, nil
 function M.preview_line(line, col)
@@ -182,7 +195,20 @@ function M.preview_line(line, col)
   end
 
   local wrapped = wrap_last_n_operands(expr, count, pair)
-  return wrapped .. after, #wrapped
+  local cursor_col = #wrapped
+
+  -- Restore closers consumed by autopairs jump-over.
+  -- The expr may have unmatched openers whose closers were in the original
+  -- line but got consumed as trigger brackets when autopairs jumped over them.
+  local unmatched = math.max(0, bracket_depth(expr, pair.open, pair.close))
+  local available = math.max(0, -bracket_depth(after, pair.open, pair.close))
+  local deficit = math.max(0, unmatched - available)
+  if deficit > 0 then
+    local restore = string.rep(pair.close, deficit)
+    return wrapped .. restore .. after, cursor_col
+  end
+
+  return wrapped .. after, cursor_col
 end
 
 function M.is_active()

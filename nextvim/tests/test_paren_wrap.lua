@@ -281,10 +281,9 @@ test("preview same as line returns nil", function()
 end)
 
 test("unmatched opener in expr: func(a+b.)", function()
-  -- The closing ) is consumed as part of the trigger pattern.
-  -- expr = "func(a+b", wraps last 1 operand => "func(a+(b)"
+  -- The trigger ) consumed the func( closer. Balance repair restores it.
   local preview, col = paren.preview_line("func(a+b.)", 10)
-  eq(preview, "func(a+(b)")
+  eq(preview, "func(a+(b))")
   eq(col, 10)
 end)
 
@@ -292,12 +291,37 @@ end)
 
 io.write("\n=== edge cases ===\n")
 
+test("autopairs: print(1+(b)+c.) single bracket", function()
+  local preview, col = paren.preview_line("print(1 + (b) + c.)", 20)
+  eq(preview, "print(1 + (b) + (c))")
+  eq(col, 19)
+end)
+
+test("autopairs: print(1+(b)+c.)) double bracket", function()
+  -- .)) wraps 2 operands, restores 1 closer for print(
+  local preview, col = paren.preview_line("print(1 + (b) + c.))", 21)
+  eq(preview, "print(1 + ((b) + c))")
+  -- cursor after wrap's ), before restored )
+  eq(col, 19)
+end)
+
+test("autopairs: nested (a + (b + c.)) restores 2 closers", function()
+  local preview, col = paren.preview_line("(a + (b + c.))", 14)
+  eq(preview, "(a + ((b + c)))")
+  eq(col, 13)
+end)
+
+test("no autopairs: func(a+b.)+c) closer in after", function()
+  -- after="+c)" already has the closer for func(, no deficit
+  local preview, col = paren.preview_line("func(a+b.)+c)", 10)
+  eq(preview, "func(a+(b)+c)")
+  eq(col, 10)
+end)
+
 test("python false positive: (1+1.) would trigger", function()
-  -- This WILL match the pattern, but the preview is harmless.
-  -- The user cancels by typing Space or any non-Enter key.
+  -- Triggers but produces balanced output. User cancels via Space.
   local preview, _ = paren.preview_line("(1+1.)", 6)
-  -- expr = "(1+1", closing ) consumed as trigger => "(1+(1)"
-  eq(preview, "(1+(1)")
+  eq(preview, "(1+(1))")
 end)
 
 test("multiple dots in expression", function()
