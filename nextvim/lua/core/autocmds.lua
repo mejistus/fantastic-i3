@@ -35,6 +35,14 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
+-- Auto-close quickfix/loclist after selecting an entry (e.g. gd with multiple candidates)
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "qf",
+  callback = function(args)
+    vim.keymap.set("n", "<CR>", "<CR>:cclose<CR>:lclose<CR>", { buffer = args.buf, silent = true })
+  end,
+})
+
 -- Ensure commentstring is set for filetypes that lack it,
 -- so Comment.nvim (gcc/gc) never gets nil.
 vim.api.nvim_create_autocmd("FileType", {
