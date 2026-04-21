@@ -46,16 +46,10 @@ vim.api.nvim_create_autocmd("FileType", {
 -- Ensure commentstring is set for filetypes that lack it,
 -- so Comment.nvim (gcc/gc) never gets nil.
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = {
-    "conf", "config", "cfg", "ini", "sshconfig", "sshdconfig",
-    "tmux", "fstab", "crontab", "samba", "resolv",
-    "toml", "dosini", "desktop", "xdefaults",
-    "gitconfig", "hgrc",
-    "bash", "zsh", "sh",
-    "i3config", "swayconfig", "hypr",
-  },
+  pattern = "*",
+  group = vim.api.nvim_create_augroup("commentstring_fallback", { clear = true }),
   callback = function()
-    if vim.bo.commentstring == "" or vim.bo.commentstring == nil then
+    if vim.bo.commentstring == "" then
       vim.bo.commentstring = "# %s"
     end
   end,
