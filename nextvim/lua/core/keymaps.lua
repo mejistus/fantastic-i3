@@ -92,7 +92,7 @@ map("n", "<space>x", "<cmd>bd<CR>", { desc = "close buffer" })
 map("n", "<leader>/", "gcc", { desc = "comment toggle", remap = true })
 map("v", "<leader>/", "gc", { desc = "comment toggle", remap = true })
 
-map("n", "<leader>gz", "<cmd>Telescope live_grep<CR>", { desc = "live grep" })
+map("n", "<leader>fw", "<cmd>Telescope live_grep<CR>", { desc = "live grep" })
 map("n", "<leader>fb", "<cmd>Telescope buffers<CR>", { desc = "find buffers" })
 map("n", "<leader>tg", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "document symbols" })
 map("n", "<leader>fo", "<cmd>Telescope oldfiles<CR>", { desc = "old files" })
@@ -656,7 +656,7 @@ map("n", "<space>dg", function()
   end
 end, { desc = "toggle diagnostics" })
 
-map("n", "<space>f", vim.diagnostic.open_float, { desc = "open diagnostics float" })
+map("n", "<leader>dd", vim.diagnostic.open_float, { desc = "open diagnostics float" })
 map({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, { desc = "code action" })
 
 vim.keymap.set("v", "<S-C>", '"+y', { noremap = true })
