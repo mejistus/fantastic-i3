@@ -639,20 +639,17 @@ map("n", "<space><Tab>", function()
   end
 end, { desc = "toggle oil" })
 
-local diagnostics_enabled = {}
+local diagnostics_hidden = {}
 map("n", "<space>dg", function()
   local bufnr = vim.api.nvim_get_current_buf()
-  if diagnostics_enabled[bufnr] == nil then
-    diagnostics_enabled[bufnr] = true
-  end
-  if diagnostics_enabled[bufnr] then
-    vim.diagnostic.disable(bufnr)
-    diagnostics_enabled[bufnr] = false
-    vim.notify("Diagnostics disabled", vim.log.levels.INFO)
-  else
-    vim.diagnostic.enable(bufnr)
-    diagnostics_enabled[bufnr] = true
+  if diagnostics_hidden[bufnr] then
+    vim.diagnostic.enable(true, { bufnr = bufnr })
+    diagnostics_hidden[bufnr] = nil
     vim.notify("Diagnostics enabled", vim.log.levels.INFO)
+  else
+    vim.diagnostic.enable(false, { bufnr = bufnr })
+    diagnostics_hidden[bufnr] = true
+    vim.notify("Diagnostics disabled", vim.log.levels.INFO)
   end
 end, { desc = "toggle diagnostics" })
 
