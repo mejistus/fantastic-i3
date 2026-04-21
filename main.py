@@ -1,0 +1,3 @@
+import dataclasses
+
+dataclasses.asdict
