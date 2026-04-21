@@ -92,7 +92,7 @@ map("n", "<space>x", "<cmd>bd<CR>", { desc = "close buffer" })
 map("n", "<leader>/", "gcc", { desc = "comment toggle", remap = true })
 map("v", "<leader>/", "gc", { desc = "comment toggle", remap = true })
 
-map("n", "<leader>fw", "<cmd>Telescope live_grep<CR>", { desc = "live grep" })
+map("n", "<leader>gz", "<cmd>Telescope live_grep<CR>", { desc = "live grep" })
 map("n", "<leader>fb", "<cmd>Telescope buffers<CR>", { desc = "find buffers" })
 map("n", "<leader>tg", "<cmd>Telescope lsp_document_symbols<CR>", { desc = "document symbols" })
 map("n", "<leader>fo", "<cmd>Telescope oldfiles<CR>", { desc = "old files" })
