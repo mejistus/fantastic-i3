@@ -243,11 +243,11 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
     if.window-title-regex-substring = '^(微信|WeChat)$'
-    run = ['layout floating', 'move-node-to-workspace 10', 'exec-and-forget center-window']
+    run = ['layout floating', 'exec-and-forget center-window']
 
 [[on-window-detected]]
     if.app-id = 'com.tencent.xinWeChat'
-    run = ['layout floating', 'move-node-to-workspace 10']
+    run = ['layout floating']
 
 [[on-window-detected]]
     if.app-id = 'org.zotero.zotero'
@@ -256,7 +256,7 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-id = 'org.zotero.zotero'
     if.window-title-regex-substring = '^(zotero)$'
-    run = ['layout tiling', 'move-node-to-workspace 1']
+    run = ['layout tiling']
 
 [[on-window-detected]]
     if.app-id = 'com.microsoft.Powerpoint'
@@ -333,19 +333,23 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[C|c]ursor.*)$'
-    run = ['layout tiling', 'move-node-to-workspace Z', 'exec-and-forget center-window']
+    run = ['layout tiling', 'exec-and-forget center-window']
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[C|c]ode.*)$'
-    run = ['layout tiling', 'move-node-to-workspace Z']
+    run = ['layout tiling']
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[T|t]rae.*)$'
-    run = ['layout tiling', 'move-node-to-workspace Z']
+    run = ['layout tiling']
 
 [[on-window-detected]]
     if.app-name-regex-substring = '^(小红书|X|知乎)$'
-    run = ['layout tiling', 'move-node-to-workspace X']
+    run = ['layout tiling']
+
+[[on-window-detected]]
+    if.app-id = 'com.apple.iCal'
+    run = ['layout floating']
 
 [[on-window-detected]]
     if.app-id = 'com.apple.ActivityMonitor'
