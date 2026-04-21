@@ -26,19 +26,7 @@ return {
       require("configs.whichkey")
     end,
   },
-  {
-    "numToStr/Comment.nvim",
-    keys = { "gc", "gcc" },
-    config = function()
-      require("Comment").setup({
-        pre_hook = function()
-          if vim.bo.commentstring == "" then
-            vim.bo.commentstring = "# %s"
-          end
-        end,
-      })
-    end,
-  },
+  { "numToStr/Comment.nvim", keys = { "gc", "gcc" }, opts = {} },
   {
     "akinsho/bufferline.nvim",
     version = "*",

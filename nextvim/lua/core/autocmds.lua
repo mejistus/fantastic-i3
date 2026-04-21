@@ -42,15 +42,3 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.keymap.set("n", "<CR>", "<CR>:cclose<CR>:lclose<CR>", { buffer = args.buf, silent = true })
   end,
 })
-
--- Ensure commentstring is set for filetypes that lack it,
--- so Comment.nvim (gcc/gc) never gets nil.
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "*",
-  group = vim.api.nvim_create_augroup("commentstring_fallback", { clear = true }),
-  callback = function()
-    if vim.bo.commentstring == "" then
-      vim.bo.commentstring = "# %s"
-    end
-  end,
-})
