@@ -29,7 +29,15 @@ return {
   {
     "numToStr/Comment.nvim",
     keys = { "gc", "gcc" },
-    opts = {},
+    config = function()
+      require("Comment").setup({
+        pre_hook = function()
+          if vim.bo.commentstring == "" then
+            vim.bo.commentstring = "# %s"
+          end
+        end,
+      })
+    end,
   },
   {
     "akinsho/bufferline.nvim",
