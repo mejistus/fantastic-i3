@@ -231,9 +231,23 @@ return {
                         enable_thinking = true,
                     },
                     model_names = {
-                        "Qwen/Qwen3-Coder-480B-A35B-Instruct",
                         "Qwen/Qwen3.5-9B",
                         "Qwen/Qwen3-32B",
+                        "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+                    },
+                },
+                siliconflow_no_thinking = {
+                    __inherited_from = "openai",
+                    endpoint = "https://api.siliconflow.cn/v1",
+                    api_key_name = "SILICONFLOW_API_TOKEN",
+                    model = "deepseek-ai/DeepSeek-V3.2",
+                    timeout = 30000,
+                    max_tokens = 256000,
+                    extra_request_body = {
+                        temperature = 0,
+                        stream = true,
+                    },
+                    model_names = {
                         "deepseek-ai/DeepSeek-V3.2",
                         "deepseek-ai/DeepSeek-V3",
                     },
