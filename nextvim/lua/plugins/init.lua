@@ -260,6 +260,9 @@ return {
                 support_paste_from_clipboard = true,
             },
             hints = { enabled = true },
+            windows = {
+                ask = { start_insert = false },
+            },
             mappings = {
                 toggle = {
                     selection = "<leader>aC",
