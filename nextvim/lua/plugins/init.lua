@@ -276,6 +276,9 @@ return {
             vim.keymap.set("n", "<leader>aC", function()
                 require("avante").toggle.selection()
             end, { desc = "avante: toggle selection", noremap = true, silent = true })
+            vim.keymap.set("n", "\\+Tab", function()
+                require("avante").toggle()
+            end, { desc = "avante: toggle", noremap = true, silent = true })
         end,
     },
 }
