@@ -236,13 +236,9 @@ return {
                         "Qwen/Qwen3-Coder-480B-A35B-Instruct",
                     },
                 },
-                siliconflow_no_thinking = {
-                    __inherited_from = "openai",
-                    endpoint = "https://api.siliconflow.cn/v1",
-                    api_key_name = "SILICONFLOW_API_TOKEN",
+                siliconflow_no_think = {
+                    __inherited_from = "siliconflow",
                     model = "deepseek-ai/DeepSeek-V3.2",
-                    timeout = 30000,
-                    max_tokens = 256000,
                     extra_request_body = {
                         temperature = 0,
                         stream = true,
@@ -270,13 +266,14 @@ return {
             },
         },
         config = function(_, opts)
+            require("avante_lib").load()
             require("avante").setup(opts)
             -- Fix: avante maps toggle.selection to M.toggle.hint() which doesn't exist,
             -- remap to the correct M.toggle.selection()
             vim.keymap.set("n", "<leader>aC", function()
                 require("avante").toggle.selection()
             end, { desc = "avante: toggle selection", noremap = true, silent = true })
-            vim.keymap.set("n", "\\+Tab", function()
+            vim.keymap.set("n", "\\<Tab>", function()
                 require("avante").toggle()
             end, { desc = "avante: toggle", noremap = true, silent = true })
         end,
