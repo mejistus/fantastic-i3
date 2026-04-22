@@ -241,7 +241,11 @@ return {
                 },
                 siliconflow_no_think = {
                     __inherited_from = "openai",
+                    endpoint = "https://api.siliconflow.cn/v1",
                     model = "deepseek-ai/DeepSeek-V3.2",
+                    api_key_name = "SILICONFLOW_API_TOKEN",
+                    timeout = 30000,
+                    max_tokens = 224000,
                     extra_request_body = {
                         temperature = 0.0,
                         stream = true,
