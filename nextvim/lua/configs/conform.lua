@@ -3,7 +3,7 @@ require("conform").setup({
     lua = { "stylua" },
     css = { "prettier" },
     html = { "prettier" },
-    python = { "black" },
+    python = { "autopep8" },
     javascript = { "prettier" },
     typescript = { "prettier" },
     cpp = { "clang-format" },
