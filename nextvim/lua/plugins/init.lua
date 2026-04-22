@@ -227,9 +227,9 @@ return {
                     api_key_name = "SILICONFLOW_API_TOKEN",
                     model = "Qwen/Qwen3.5-9B",
                     timeout = 30000,
-                    max_tokens = 256000,
+                    max_tokens = 224000,
                     extra_request_body = {
-                        temperature = 0,
+                        temperature = 0.1,
                         stream = true,
                         enable_thinking = true,
                     },
@@ -240,10 +240,10 @@ return {
                     },
                 },
                 siliconflow_no_think = {
-                    __inherited_from = "siliconflow",
+                    __inherited_from = "openai",
                     model = "deepseek-ai/DeepSeek-V3.2",
                     extra_request_body = {
-                        temperature = 0,
+                        temperature = 0.1,
                         stream = true,
                     },
                     model_names = {
