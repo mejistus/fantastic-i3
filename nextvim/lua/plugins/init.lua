@@ -206,7 +206,7 @@ return {
         "yetone/avante.nvim",
         event = "VeryLazy",
         version = false,
-        build = "make",
+        build = "env -u CARGO_TARGET_DIR make BUILD_FROM_SOURCE=true",
         init = function()
             require("avante_lib").load()
         end,
