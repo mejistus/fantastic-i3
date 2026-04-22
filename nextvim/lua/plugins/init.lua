@@ -229,7 +229,7 @@ return {
                     timeout = 30000,
                     max_tokens = 224000,
                     extra_request_body = {
-                        temperature = 0.1,
+                        temperature = 0.0,
                         stream = true,
                         enable_thinking = true,
                     },
@@ -243,7 +243,7 @@ return {
                     __inherited_from = "openai",
                     model = "deepseek-ai/DeepSeek-V3.2",
                     extra_request_body = {
-                        temperature = 0.1,
+                        temperature = 0.0,
                         stream = true,
                     },
                     model_names = {
