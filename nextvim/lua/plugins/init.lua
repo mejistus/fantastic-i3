@@ -207,6 +207,9 @@ return {
         event = "VeryLazy",
         version = false,
         build = "make",
+        init = function()
+            require("avante_lib").load()
+        end,
         dependencies = {
             "nvim-treesitter/nvim-treesitter",
             "stevearc/dressing.nvim",
@@ -266,7 +269,6 @@ return {
             },
         },
         config = function(_, opts)
-            require("avante_lib").load()
             require("avante").setup(opts)
             -- Fix: avante maps toggle.selection to M.toggle.hint() which doesn't exist,
             -- remap to the correct M.toggle.selection()
