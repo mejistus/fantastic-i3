@@ -128,12 +128,18 @@ return {
 
     {
         "nvim-treesitter/nvim-treesitter",
+        branch = "master",
+        lazy = false,
         build = ":TSUpdate",
-        event = { "BufReadPost", "BufNewFile" },
-        main = "nvim-treesitter",
-        dependencies = { "nvim-treesitter/nvim-treesitter-textobjects" },
         config = function()
-            require("configs.treesitter")
+            require("nvim-treesitter.configs").setup({
+                ensure_installed = { "python", "json", "yaml", "bash", "latex", "bibtex" },
+                sync_install = false,
+                auto_install = true,
+                highlight = { enable = true },
+            })
+
+            vim.treesitter.language.register("bash", "zsh")
         end,
     },
 
