@@ -127,19 +127,56 @@ return {
     },
 
     {
+
         "nvim-treesitter/nvim-treesitter",
-        branch = "master",
+        branch = vim.fn.has("nvim-0.12") == 1 and "main" or "master",
         lazy = false,
         build = ":TSUpdate",
-        config = function()
-            require("nvim-treesitter.configs").setup({
-                ensure_installed = { "python", "json", "yaml", "bash", "latex", "bibtex" },
-                sync_install = false,
-                auto_install = true,
-                highlight = { enable = true },
-            })
 
-            vim.treesitter.language.register("bash", "zsh")
+        config = function()
+            local langs = { "python", "json", "yaml", "bash", "latex", "bibtex" }
+            if vim.fn.has("nvim-0.12") == 1 then
+                local ts = require("nvim-treesitter")
+                ts.setup({
+                    install_dir = vim.fn.stdpath("data") .. "/site",
+                })
+                ts.install(langs):wait(300000)
+                vim.treesitter.language.register("bash", { "zsh" })
+                vim.api.nvim_create_autocmd("FileType", {
+                    pattern = {
+                        "python",
+                        "json",
+                        "yaml",
+                        "bash",
+                        "zsh",
+                        "tex",
+                        "plaintex",
+                        "bib",
+                    },
+                    callback = function(args)
+                        local ft = vim.bo[args.buf].filetype
+                        local map = {
+                            zsh = "bash",
+                            tex = "latex",
+                            plaintex = "latex",
+                            bib = "bibtex",
+
+                        }
+                        local lang = map[ft] or ft
+                        pcall(vim.treesitter.start, args.buf, lang)
+                    end,
+                })
+            else
+                require("nvim-treesitter.configs").setup({
+                    ensure_installed = langs,
+                    sync_install = false,
+                    auto_install = true,
+                    highlight = {
+                        enable = true,
+                    },
+                })
+                vim.treesitter.language.register("bash", "zsh")
+            end
         end,
     },
 
