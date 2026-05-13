@@ -280,12 +280,11 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.app-id = 'com.apple.finder'
-    run = 'layout floating'
-    check-further-callbacks = true
+    run = ['layout floating']
 
 [[on-window-detected]]
     if.app-id = 'cn.shandianshuo.desktop'
-    run = 'layout floating'
+    run = ['layout floating', 'move-node-to-workspace current']
 
 [[on-window-detected]]
     if.app-id = 'io.github.clash-verge-rev.clash-verge-rev'
