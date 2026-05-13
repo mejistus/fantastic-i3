@@ -120,17 +120,15 @@ on-mode-changed = []
   [ -n "$wid" ] && aerospace focus --window-id "$wid"
   osascript -e "tell application \"Safari\" to activate"
 ' ''']
-    # alt-t = 'workspace --auto-back-and-forth T'
-    # alt-b = 'workspace --auto-back-and-forth B'
-    # alt-c = 'workspace --auto-back-and-forth C'
-    # alt-z = 'workspace --auto-back-and-forth Z'
-    # alt-x = 'workspace --auto-back-and-forth X'
+
+    alt-d = 'exec-and-forget bash $HOME/Documents/fantastic-i3/macos/new_window_here'
 
     alt-t = 'workspace T'
     alt-b = 'workspace B'
     alt-c = 'workspace C'
     alt-z = 'workspace Z'
     alt-x = 'workspace X'
+    # alt-x = 'workspace --auto-back-and-forth X'
 
     alt-h = 'focus left'
     alt-j = 'focus down'
