@@ -281,6 +281,7 @@ on-mode-changed = []
 [[on-window-detected]]
     if.app-id = 'com.apple.finder'
     run = 'layout floating'
+    check-further-callbacks = true
 
 [[on-window-detected]]
     if.app-id = 'cn.shandianshuo.desktop'
