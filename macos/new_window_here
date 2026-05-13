@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+APP=${1:-Finder}
+WINDOW_ID=$(aerospace list-windows --all --format "%{window-id} %{app-name}" | grep " Finder" | head -n1 | cut -d" " -f1)
+WORKSPACE_ID=$(aerospace list-workspaces --focused)
+
+if [ -z "$WINDOW_ID" ]; then
+    osascript -e "tell application \"Finder\" to make new Finder window"
+    sleep 0.3
+    WINDOW_ID=$(aerospace list-windows --all --format "%{window-id} %{app-name}" | grep " Finder" | head -n1 | cut -d" " -f1)
+fi
+
+aerospace move-node-to-workspace --window-id "$WINDOW_ID" "$WORKSPACE_ID" --fail-if-noop
+
+aerospace focus --window-id "$WINDOW_ID"
