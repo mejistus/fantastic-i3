@@ -233,6 +233,13 @@ on-mode-changed = []
     if.app-id = 'com.baidu.netdisk'
     run = ['layout floating', 'move-node-to-workspace B']
 
+[[on-window-detected]]
+    if.app-id = 'com.HarmonyOSInterconnection.app'
+    run = ['layout floating']
+
+[[on-window-detected]]
+    if.app-id = 'com.google.Chrome'
+    run = ['layout floating', 'move-node-to-workspace 3']
 
 [[on-window-detected]]
     if.app-id = 'com.kangfenmao.CherryStudio'
