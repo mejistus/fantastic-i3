@@ -1,5 +1,7 @@
 local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
+require("configs.lsp_util").patch_symbols_to_items()
+
 local on_attach = function(_, bufnr)
   local opts = { noremap = true, silent = true, buffer = bufnr }
   vim.keymap.set("n", "F", vim.lsp.buf.hover, opts)
