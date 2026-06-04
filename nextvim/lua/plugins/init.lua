@@ -1,3 +1,16 @@
+local function siliconflow_parse_curl_args(provider, prompt_opts)
+    local spec = require("avante.providers.openai").parse_curl_args(provider, prompt_opts)
+    if not spec then
+        return nil
+    end
+
+    spec.rawArgs = vim.list_extend(spec.rawArgs or {}, { "-N" })
+    spec.body.stream = true
+    spec.body.stream_options = nil
+
+    return spec
+end
+
 return {
     {
         "folke/tokyonight.nvim",
@@ -334,13 +347,17 @@ return {
                     api_key_name = "SILICONFLOW_API_TOKEN",
                     model = "Qwen/Qwen3.5-9B",
                     timeout = 30000,
-                    max_tokens = 224000,
+                    disable_tools = true,
+                    rawArgs = { "-N" },
+                    parse_curl_args = siliconflow_parse_curl_args,
                     extra_request_body = {
+                        max_tokens = 8192,
                         temperature = 0.0,
                         stream = true,
                         enable_thinking = true,
                     },
                     model_names = {
+                        "Pro/zai-org/GLM-4.7",
                         "Qwen/Qwen3.5-4B",
                         "Qwen/Qwen3.5-9B",
                         "Qwen/Qwen3-32B",
@@ -353,12 +370,16 @@ return {
                     model = "deepseek-ai/DeepSeek-V3.2",
                     api_key_name = "SILICONFLOW_API_TOKEN",
                     timeout = 30000,
-                    max_tokens = 224000,
+                    disable_tools = true,
+                    rawArgs = { "-N" },
+                    parse_curl_args = siliconflow_parse_curl_args,
                     extra_request_body = {
+                        max_tokens = 8192,
                         temperature = 0.0,
                         stream = true,
                     },
                     model_names = {
+                        "Pro/zai-org/GLM-4.7",
                         "deepseek-ai/DeepSeek-V3.2",
                         "deepseek-ai/DeepSeek-V3",
                     },
