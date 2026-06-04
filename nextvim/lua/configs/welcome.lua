@@ -8,8 +8,6 @@ local state = {
   b = 0,
 }
 
-local donut_width = 54
-local donut_height = 23
 local luminance = ".,-~:;=!*#$@"
 
 local menu = {
@@ -34,7 +32,22 @@ local function center_line(text)
   return string.rep(" ", math.max(0, math.floor((width - #text) / 2))) .. text
 end
 
+local function donut_size()
+  local columns = vim.api.nvim_get_option_value("columns", {})
+  local lines = vim.api.nvim_get_option_value("lines", {})
+  local reserved_lines = #menu + 5
+  local height = math.max(16, math.min(34, lines - reserved_lines))
+  local width = math.max(40, math.min(78, math.floor(height * 2.35), columns - 8))
+
+  if height > math.floor(width / 2) then
+    height = math.max(16, math.floor(width / 2))
+  end
+
+  return width, height
+end
+
 local function render_donut()
+  local donut_width, donut_height = donut_size()
   local chars = {}
   local zbuffer = {}
   for i = 1, donut_width * donut_height do
@@ -64,8 +77,8 @@ local function render_donut()
       local z = 5 + cos_a * circle_x * sinphi + circle_y * sin_a
       local inv_z = 1 / z
 
-      local xp = math.floor(donut_width / 2 + 20 * inv_z * x)
-      local yp = math.floor(donut_height / 2 - 10 * inv_z * y)
+      local xp = math.floor(donut_width / 2 + donut_width * 0.38 * inv_z * x)
+      local yp = math.floor(donut_height / 2 - donut_height * 0.36 * inv_z * y)
       local idx = xp + donut_width * yp + 1
 
       local light =
@@ -91,7 +104,7 @@ local function render_donut()
     local line = table.concat(vim.list_slice(chars, row * donut_width + 1, (row + 1) * donut_width))
     table.insert(lines, center_line(line))
   end
-  return lines
+  return lines, donut_height
 end
 
 local function command_line(item)
@@ -109,7 +122,8 @@ local function build_lines()
   local height = vim.api.nvim_get_option_value("lines", {})
   local content = {}
 
-  for _, line in ipairs(render_donut()) do
+  local donut_lines, donut_height = render_donut()
+  for _, line in ipairs(donut_lines) do
     table.insert(content, line)
   end
   table.insert(content, "")
@@ -126,10 +140,10 @@ local function build_lines()
     table.insert(lines, "")
   end
   vim.list_extend(lines, content)
-  return lines, top
+  return lines, top, donut_height
 end
 
-local function color_donut(bufnr, top)
+local function color_donut(bufnr, top, donut_height)
   local groups = {
     "NextVimWelcomeDonut1",
     "NextVimWelcomeDonut2",
@@ -187,11 +201,11 @@ local function render()
     return
   end
 
-  local lines, top = build_lines()
+  local lines, top, donut_height = build_lines()
   vim.bo[bufnr].modifiable = true
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-  color_donut(bufnr, top)
+  color_donut(bufnr, top, donut_height)
   color_text(bufnr, lines)
   vim.bo[bufnr].modifiable = false
 end
