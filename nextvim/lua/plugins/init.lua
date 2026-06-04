@@ -372,7 +372,10 @@ return {
             },
             hints = { enabled = true },
             windows = {
-                ask = { start_insert = false },
+                ask = {
+                    floating = false,
+                    start_insert = false,
+                },
             },
             mappings = {
                 toggle = {
@@ -381,7 +384,21 @@ return {
             },
         },
         config = function(_, opts)
-            require("avante").setup(opts)
+            local avante_utils = require("avante.utils")
+            local original_info = avante_utils.info
+            avante_utils.info = function(msg, notify_opts)
+                if type(msg) == "string" and msg:find("^Using previously selected model:") then
+                    return
+                end
+                return original_info(msg, notify_opts)
+            end
+            local ok, err = xpcall(function()
+                require("avante").setup(opts)
+            end, debug.traceback)
+            avante_utils.info = original_info
+            if not ok then
+                error(err)
+            end
             -- Fix: avante maps toggle.selection to M.toggle.hint() which doesn't exist,
             -- remap to the correct M.toggle.selection()
             vim.keymap.set("n", "<leader>aC", function()
