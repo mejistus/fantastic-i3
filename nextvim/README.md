@@ -1,4 +1,4 @@
-# Neovim Config (Decoupled From NvChad)
+#Neovim Config (Decoupled From NvChad)
 
 This directory is a standalone Neovim configuration based on `lazy.nvim`.
 
