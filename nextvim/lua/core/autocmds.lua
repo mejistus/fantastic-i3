@@ -42,3 +42,9 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.keymap.set("n", "<CR>", "<CR>:cclose<CR>:lclose<CR>", { buffer = args.buf, silent = true })
   end,
 })
+
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    require("configs.welcome").open()
+  end,
+})
