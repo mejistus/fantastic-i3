@@ -1,0 +1,3 @@
+[submodule "nextvim"]
+	path = nextvim
+	url = https://github.com/mejistus/NextVim.git
