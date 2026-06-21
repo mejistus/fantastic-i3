@@ -1,0 +1,471 @@
+#!/usr/bin/env bash
+
+set -u
+
+HOST=""
+PORT=22
+INTERVAL=5
+LOCAL_MODE=0
+NO_LOCK=0
+BAR_WIDTH=18
+CENTER_MODE=0
+NAME_WIDTH=18
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_DIM="\033[2m"
+C_RED="\033[31m"
+C_GREEN="\033[32m"
+C_YELLOW="\033[33m"
+C_CYAN="\033[36m"
+
+LAST_RENDER_LINES=0
+CURRENT_CHILD=""
+TMP_OUTPUT=""
+EXITING=0
+
+show_help() {
+    cat <<'EOF'
+Usage:
+  watch_gpu_ssh [HOST] [OPTIONS]
+
+Examples:
+  watch_gpu_ssh user@example.com -p 2222
+  watch_gpu_ssh user@example.com -p 2222 -i 3
+  watch_gpu_ssh gpu-server -i 5
+  watch_gpu_ssh --local
+  watch_gpu_ssh gpu-server --no-lock
+
+Options:
+  -p, --port PORT       SSH port. Default: 22
+  -i, --interval SEC    Refresh interval. Default: 5
+  -w, --bar-width N     Bar width. Default: 18
+  -n, --name-width N    GPU name width. Default: 18
+      --center          Use centered layout
+  -l, --local           Run nvidia-smi locally instead of SSH
+      --no-lock         Allow multiple instances
+  -h, --help            Show this help
+
+Notes:
+  - Default mode is exclusive: one watcher per host+port.
+  - Works on both macOS and Linux.
+  - Press Ctrl+C to quit.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -h | --help)
+        show_help
+        exit 0
+        ;;
+    -p | --port)
+        PORT="${2:?Missing value for $1}"
+        shift 2
+        ;;
+    --port=*)
+        PORT="${1#*=}"
+        shift
+        ;;
+    -i | --interval)
+        INTERVAL="${2:?Missing value for $1}"
+        shift 2
+        ;;
+    --interval=*)
+        INTERVAL="${1#*=}"
+        shift
+        ;;
+    -w | --bar-width)
+        BAR_WIDTH="${2:?Missing value for $1}"
+        shift 2
+        ;;
+    --bar-width=*)
+        BAR_WIDTH="${1#*=}"
+        shift
+        ;;
+    -n | --name-width)
+        NAME_WIDTH="${2:?Missing value for $1}"
+        shift 2
+        ;;
+    --name-width=*)
+        NAME_WIDTH="${1#*=}"
+        shift
+        ;;
+    --center)
+        CENTER_MODE=1
+        shift
+        ;;
+    -l | --local)
+        LOCAL_MODE=1
+        shift
+        ;;
+    --no-lock)
+        NO_LOCK=1
+        shift
+        ;;
+    -*)
+        echo "Unknown option: $1"
+        echo "Try: watch_gpu_ssh --help"
+        exit 1
+        ;;
+    *)
+        if [[ -z "$HOST" ]]; then
+            HOST="$1"
+        else
+            echo "Unexpected argument: $1"
+            echo "Try: watch_gpu_ssh --help"
+            exit 1
+        fi
+        shift
+        ;;
+    esac
+done
+
+if [[ "$LOCAL_MODE" -eq 0 && -z "$HOST" ]]; then
+    echo "Missing HOST."
+    echo "Try: watch_gpu_ssh --help"
+    exit 1
+fi
+
+if [[ "$LOCAL_MODE" -eq 1 ]]; then
+    HOST="local"
+fi
+
+LOCK_KEY="$(printf "%s_%s" "$HOST" "$PORT" | tr '/:@. ' '_____')"
+LOCK_DIR="/tmp/watch_gpu_ssh_${LOCK_KEY}.lock"
+
+cleanup_lock() {
+    if [[ "$NO_LOCK" -eq 0 && -d "$LOCK_DIR" ]]; then
+        rm -rf "$LOCK_DIR"
+    fi
+}
+
+restore_terminal() {
+    printf "\033[?25h"
+    printf "\033[?1049l"
+}
+
+cleanup_all() {
+    if [[ "$EXITING" -eq 1 ]]; then
+        return
+    fi
+
+    EXITING=1
+    trap - EXIT INT TERM HUP
+
+    if [[ -n "${CURRENT_CHILD:-}" ]]; then
+        kill "$CURRENT_CHILD" 2>/dev/null || true
+        wait "$CURRENT_CHILD" 2>/dev/null || true
+    fi
+
+    if [[ -n "${TMP_OUTPUT:-}" && -f "$TMP_OUTPUT" ]]; then
+        rm -f "$TMP_OUTPUT"
+    fi
+
+    restore_terminal
+    cleanup_lock
+}
+
+quit() {
+    cleanup_all
+    exit 130
+}
+
+trap quit INT TERM HUP
+trap cleanup_all EXIT
+
+if [[ "$NO_LOCK" -eq 0 ]]; then
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" >"$LOCK_DIR/pid"
+    else
+        old_pid=""
+        if [[ -f "$LOCK_DIR/pid" ]]; then
+            old_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+        fi
+
+        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+            echo "Already running for: $HOST:$PORT"
+            echo "PID: $old_pid"
+            echo "Use --no-lock to allow another instance."
+            exit 1
+        else
+            rm -rf "$LOCK_DIR"
+            if mkdir "$LOCK_DIR" 2>/dev/null; then
+                echo "$$" >"$LOCK_DIR/pid"
+            else
+                echo "Failed to create lock: $LOCK_DIR"
+                echo "Use --no-lock to bypass."
+                exit 1
+            fi
+        fi
+    fi
+fi
+
+SSH_OPTS=(
+    -p "$PORT"
+    -n
+    -o ServerAliveInterval=10
+    -o ServerAliveCountMax=2
+    -o ConnectTimeout=8
+    -o BatchMode=yes
+    -o EscapeChar=none
+)
+
+query_gpu_direct() {
+    local cmd
+    cmd='nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit --format=csv,noheader,nounits'
+
+    if [[ "$LOCAL_MODE" -eq 1 ]]; then
+        bash -lc "$cmd"
+    else
+        ssh "${SSH_OPTS[@]}" "$HOST" "$cmd"
+    fi
+}
+
+run_query_capture() {
+    TMP_OUTPUT="$(mktemp -t watch_gpu_ssh.XXXXXX)"
+
+    query_gpu_direct >"$TMP_OUTPUT" 2>&1 &
+    CURRENT_CHILD="$!"
+
+    wait "$CURRENT_CHILD"
+    local status=$?
+
+    CURRENT_CHILD=""
+
+    output="$(cat "$TMP_OUTPUT" 2>/dev/null || true)"
+    rm -f "$TMP_OUTPUT"
+    TMP_OUTPUT=""
+
+    return "$status"
+}
+
+short_name() {
+    local name="$1"
+
+    name="${name/NVIDIA /}"
+    name="${name/Tesla /}"
+    name="${name/GeForce /}"
+    name="${name/RTX /RTX }"
+
+    printf "%s" "$name"
+}
+
+format_bar() {
+    local pct="$1"
+    local width="$2"
+
+    awk -v pct="$pct" -v width="$width" '
+    BEGIN {
+      if (pct < 0) pct = 0
+      if (pct > 100) pct = 100
+
+      filled = int((pct * width + 50) / 100)
+
+      bar = ""
+      for (i = 1; i <= width; i++) {
+        if (i <= filled) {
+          bar = bar "●"
+        } else {
+          bar = bar "○"
+        }
+      }
+
+      printf "%s", bar
+    }
+  '
+}
+
+color_pct() {
+    local pct="$1"
+
+    if ((pct >= 85)); then
+        printf "%b" "$C_RED"
+    elif ((pct >= 55)); then
+        printf "%b" "$C_YELLOW"
+    else
+        printf "%b" "$C_GREEN"
+    fi
+}
+
+render_top() {
+    local now
+    now="$(date '+%H:%M:%S')"
+
+    if [[ "$LOCAL_MODE" -eq 1 ]]; then
+        printf "%b%s%b  %b%s%b  %b%ss%b\n\n" \
+            "$C_BOLD" "$HOST" "$C_RESET" \
+            "$C_DIM" "$now" "$C_RESET" \
+            "$C_DIM" "$INTERVAL" "$C_RESET"
+    else
+        printf "%b%s:%s%b  %b%s%b  %b%ss%b\n\n" \
+            "$C_BOLD" "$HOST" "$PORT" "$C_RESET" \
+            "$C_DIM" "$now" "$C_RESET" \
+            "$C_DIM" "$INTERVAL" "$C_RESET"
+    fi
+}
+
+render_gpu_output() {
+    local raw="$1"
+
+    awk -F',' '
+    function trim(s) {
+      gsub(/^[ \t]+|[ \t]+$/, "", s)
+      return s
+    }
+
+    {
+      idx = trim($1)
+      name = trim($2)
+      util = trim($3) + 0
+      mem_used = trim($4) + 0
+      mem_total = trim($5) + 0
+      temp = trim($6)
+      power = trim($7)
+      power_limit = trim($8)
+
+      mem_pct = 0
+      if (mem_total > 0) {
+        mem_pct = mem_used / mem_total * 100
+      }
+
+      printf "%s\t%s\t%d\t%d\t%d\t%d\t%s\t%s\t%s\n", \
+        idx, name, util, mem_used, mem_total, mem_pct, temp, power, power_limit
+    }
+  ' <<<"$raw" | while IFS=$'\t' read -r idx name util mem_used mem_total mem_pct temp power power_limit; do
+        name="$(short_name "$name")"
+
+        util_color="$(color_pct "$util")"
+        mem_color="$(color_pct "$mem_pct")"
+
+        util_bar="$(format_bar "$util" "$BAR_WIDTH")"
+        mem_bar="$(format_bar "$mem_pct" "$BAR_WIDTH")"
+
+        printf "%bGPU%-2s%b %-${NAME_WIDTH}.${NAME_WIDTH}s " \
+            "$C_BOLD" "$idx" "$C_RESET" "$name"
+
+        printf "%bU%b %b%s%b %3d%% " \
+            "$C_DIM" "$C_RESET" \
+            "$util_color" "$util_bar" "$C_RESET" \
+            "$util"
+
+        printf "%bM%b %b%s%b %5d/%-5dMB " \
+            "$C_DIM" "$C_RESET" \
+            "$mem_color" "$mem_bar" "$C_RESET" \
+            "$mem_used" "$mem_total"
+
+        printf "%b%s°C%b %s/%sW\n" \
+            "$C_CYAN" "$temp" "$C_RESET" \
+            "$power" "$power_limit"
+    done
+}
+
+count_lines() {
+    awk 'END { print NR }'
+}
+
+visible_width_approx() {
+    local text="$1"
+
+    printf "%b" "$text" |
+        sed $'s/\033\\[[0-9;?]*[A-Za-z]//g' |
+        awk '{
+            if (length($0) > max) max = length($0)
+        }
+        END {
+            print max + 0
+        }'
+}
+
+center_frame() {
+    local frame="$1"
+    local cols lines width height left top
+
+    cols="$(tput cols 2>/dev/null || echo 120)"
+    lines="$(tput lines 2>/dev/null || echo 30)"
+
+    width="$(visible_width_approx "$frame")"
+    height="$(printf "%b" "$frame" | count_lines)"
+
+    left=$(((cols - width) / 2))
+    top=$(((lines - height) / 2))
+
+    if ((left < 0)); then
+        left=0
+    fi
+
+    if ((top < 0)); then
+        top=0
+    fi
+
+    {
+        for ((i = 0; i < top; i++)); do
+            printf "\n"
+        done
+
+        printf "%b" "$frame" | while IFS= read -r line; do
+            printf "%*s%b\n" "$left" "" "$line"
+        done
+    }
+}
+
+draw_frame() {
+    local frame="$1"
+    local final_frame="$frame"
+    local lines
+
+    if [[ "$CENTER_MODE" -eq 1 ]]; then
+        final_frame="$(center_frame "$frame")"
+    fi
+
+    lines="$(printf "%b" "$final_frame" | count_lines)"
+
+    printf "\033[H"
+    printf "%b" "$final_frame"
+
+    if ((LAST_RENDER_LINES > lines)); then
+        local extra=$((LAST_RENDER_LINES - lines))
+        for ((i = 0; i < extra; i++)); do
+            printf "\033[2K\n"
+        done
+    fi
+
+    LAST_RENDER_LINES="$lines"
+}
+
+make_frame() {
+    local frame_output="$1"
+    local frame_status="$2"
+
+    {
+        render_top
+
+        if [[ "$frame_status" -eq 0 ]]; then
+            render_gpu_output "$frame_output"
+            printf "\n%bCtrl+C%b\n" "$C_DIM" "$C_RESET"
+        else
+            printf "%bdisconnected%b\n\n" "$C_RED" "$C_RESET"
+            printf "%b%s%b\n" "$C_DIM" "$frame_output" "$C_RESET"
+        fi
+    } | sed $'s/$/\033[K/'
+}
+
+printf "\033[?1049h"
+printf "\033[?25l"
+printf "\033[H\033[2J"
+
+while true; do
+    output=""
+    status=0
+
+    run_query_capture
+    status=$?
+
+    frame="$(make_frame "$output" "$status")"
+    draw_frame "$frame"
+
+    sleep "$INTERVAL" &
+    CURRENT_CHILD="$!"
+    wait "$CURRENT_CHILD" || true
+    CURRENT_CHILD=""
+done
