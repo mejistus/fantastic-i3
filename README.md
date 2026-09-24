@@ -57,3 +57,5 @@ fcitx5 `wechat-dark-menu` theme (WeChat panel + dark menus).
 
 Theme config was corrected and bugs fixed with Muse Spark 1.3 Free and
 DeepSeek 4.1 Flash.
+
+感谢自由软件与自由模型。
