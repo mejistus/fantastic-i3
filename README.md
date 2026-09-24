@@ -36,6 +36,7 @@ For examples, to activate #2 style which has a CPU monitor, just run `python ~/.
 ## Customed Nvchad (Neovim)
 
 Have a good look at the mappings.lua file, Combine qutebrowser to free your mouse and neck~ (Code hover keys I modified to 'F'.Press Shift-f twice to look up).
+These lua config was written by Claude Code mostly.
 
 ![1751286279192](image/README/1751286279192.png)
 
