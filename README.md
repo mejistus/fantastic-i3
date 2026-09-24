@@ -43,3 +43,17 @@ These lua config was written by Claude Code mostly.
 ## lighdm-slick-greater
 
 Maybe you want it.
+
+## Unified macOS Tahoe Dark Theme
+
+GTK2/3/4 + Qt5/6 + fcitx5 + rofi unified to MacTahoe dark on i3/X11.
+Details and apply steps: see [THEME.md](THEME.md) (`install.sh` installs the deps).
+
+Bugs fixed along the way: stale xsettingsd broadcast overriding themes,
+missing `MacTahoe-Dark` falling back to light Adwaita, KDE apps bypassing
+qt6ct icons via kdeglobals, qt6ct custom palette covering Kvantum dark colors,
+statically-linked Qt apps (WeChat) marked as unthemeable, plus a hybrid
+fcitx5 `wechat-dark-menu` theme (WeChat panel + dark menus).
+
+Theme config was corrected and bugs fixed with Muse Spark 1.3 Free and
+DeepSeek 4.1 Flash.
