@@ -1,2 +1,5 @@
 [General]
-theme=KvGnome
+theme=MacTahoeDark
+
+[Applications]
+MacTahoeDark=dolphin
