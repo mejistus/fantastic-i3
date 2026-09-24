@@ -30,6 +30,7 @@ gtk-2.0/gtkrc-2.0                   → ~/.gtkrc-2.0
 xsettingsd/xsettingsd.conf          → ~/.config/xsettingsd/xsettingsd.conf
 fcitx5/conf/classicui.conf          → ~/.config/fcitx5/conf/classicui.conf
 fcitx5/themes/wechat-dark-menu/     → ~/.local/share/fcitx5/themes/wechat-dark-menu/
+kde/kdeglobals ([Icons] Theme)      → ~/.config/kdeglobals（KDE 程序图标必经此，否则硬回退 breeze）
 fontconfig/fonts.conf               → ~/.config/fontconfig/fonts.conf（已一致，monospace=Maple）
 kitty/kitty.conf                    → ~/.config/kitty/kitty.conf（font Maple Mono）
 ```
