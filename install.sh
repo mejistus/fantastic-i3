@@ -6,7 +6,7 @@ set -u
 cd "$(dirname "$0")"
 
 echo "=== [1/2] AUR 包（Tahoe 家族 + Maple + 微信输入法皮肤） ==="
-AUR_PKGS="mactahoe-gtk-theme mactahoe-icon-theme-git mactahoe-cursor-theme-git mactahoe-plasma-theme-git ttf-maple otf-apple-pingfang fcitx5-theme-wechat"
+AUR_PKGS="mactahoe-gtk-theme mactahoe-icon-theme-git mactahoe-cursor-theme-git mactahoe-plasma-theme-git maplemono-nf-cn otf-apple-pingfang fcitx5-theme-wechat"
 # shellcheck disable=SC2086
 yay -S --needed --noconfirm $AUR_PKGS
 
