@@ -1,0 +1,7 @@
+# 工作区切换 —— native 模式（没有 yabai 脚本扩展）
+# ⌥1 … ⌥9 ⌥0 与 ⌃⌥←/⌃⌥→ 直接交给 macOS 自带的"切换到桌面 N / 向左右移动一个桌面"快捷键
+# （aero keys native 已在系统设置里配好），这里不绑定。
+# macOS 每个动作只能设一个快捷键，所以 ⌃H/⌃L 由 aero 模拟按一下 ⌃⌥←/⌃⌥→。
+
+ctrl - h : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace prev
+ctrl - l : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace next

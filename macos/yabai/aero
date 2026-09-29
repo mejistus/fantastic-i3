@@ -1,0 +1,424 @@
+#!/bin/bash
+# aero —— 在 yabai 上模拟 AeroSpace 的命令，让 skhdrc 能与 aerospace.toml 一一对应。
+#
+#   aero workspace <名字|next|prev|recent>                   = workspace（recent = workspace-back-and-forth）
+#   aero move-node-to-workspace <名字> [--focus-follows-window] = move-node-to-workspace（+ 跟过去）
+#   aero move-workspace-to-monitor [--wrap-around] next      = move-workspace-to-monitor
+#   aero fullscreen                                          = fullscreen（平铺、浮动窗口都能用）
+#   aero resize <smart|width|height> <+N|-N>                 = resize
+#   aero center [窗口 id]                                     替代 center-window 脚本
+#   aero tile-floating                                       service 模式的 f：浮动窗口全部改回平铺并平均分配
+#   aero focus-window <窗口 id>                              聚焦窗口（在别的桌面就先切过去）
+#   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌥⇥ 窗口切换器用）
+#   aero helper <…>                                          运行 aero-helper（需要时自动编译）
+#   aero reload                                              = reload-config（不重启 yabai，不打乱窗口）
+#   aero keys <auto|sa|native> [--force]                     桌面快捷键模式（见下）
+#   aero spaces                                              创建 / 标记工作区对应的桌面
+#   aero status                                              查看当前状态
+#
+# 工作区 = macOS 桌面，编号 1-10 就是调度中心里的第 1-10 个桌面（⌥1…⌥9 ⌥0）。
+# 以后要加带名字的工作区，把名字加进 WORKSPACES，并在 KEY_ASCII / KEY_CODE / KEY_NAME 里补上按键：
+# 非数字的名字会自动贴成 yabai 标签。
+#
+# 桌面快捷键（⌥1…⌥0、⌃H ⌃L）有两种模式，yabai 启动时按 SA 是否加载成功自动选择：
+#   sa     —— 已加载 yabai 脚本扩展（SA）：由 skhd 调 yabai，瞬间切换、没有动画；
+#             macOS 自带的"切换到桌面 N / 左右移一个桌面"快捷键会被关掉，避免冲突。
+#   native —— 没有 SA：同样的按键交给 macOS 自带快捷键（有滑动动画）。
+
+set -u
+export PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+MACOS=$(dirname "$HERE")
+KEYS_LINK="$HOME/.config/skhd/workspaces.skhdrc"
+STATE="/tmp/yabai-aero-$USER"
+mkdir -p "$STATE"
+
+WORKSPACES=(1 2 3 4 5 6 7 8 9 10)
+PERSISTENT=${#WORKSPACES[@]}                    # ⌃H/⌃L 经过所有工作区，与 macOS 自带的一致
+# 第 i 个工作区的 macOS "切换到桌面 i" 快捷键 = ⌥ + 该键（ASCII 码 / 虚拟键码）：⌥1 … ⌥9 ⌥0
+KEY_ASCII=(49 50 51 52 53 54 55 56 57 48)
+KEY_CODE=(18 19 20 21 23 22 26 28 25 29)
+KEY_NAME=(1 2 3 4 5 6 7 8 9 0)                  # 同一个键在 skhd 里的写法
+MAX_DESKTOP_HOTKEYS=16                          # 系统快捷键 118-133 = 切换到桌面 1-16
+OPTION=524288
+CONTROL=262144
+
+notify() {
+    osascript -e "display notification \"$1\" with title \"yabai\"" >/dev/null 2>&1
+}
+
+keys_mode() {
+    case $(readlink "$KEYS_LINK" 2>/dev/null) in
+        *-sa.skhdrc) echo sa ;;
+        *-native.skhdrc) echo native ;;
+        *) echo none ;;
+    esac
+}
+
+space_index() {
+    yabai -m query --spaces --space "$1" 2>/dev/null | jq -r '.index // empty'
+}
+
+current_space() {
+    yabai -m query --spaces --space | jq -r .index
+}
+
+# 小工具 aero-helper（Swift，源码 helper/main.swift）：模拟按键、等修饰键松开、窗口切换列表。
+# 第一次用到或源码改过时自动编译（约 15 秒）。
+HELPER_SRC="$HERE/helper/main.swift"
+HELPER="$HOME/.cache/fantastic-i3/aero-helper"
+helper() {
+    if [ ! -x "$HELPER" ] || [ "$HELPER_SRC" -nt "$HELPER" ]; then
+        mkdir -p "$(dirname "$HELPER")"
+        if swiftc -O -swift-version 5 -o "$HELPER.$$" "$HELPER_SRC" 2>/dev/null; then
+            mv -f "$HELPER.$$" "$HELPER"
+        else
+            rm -f "$HELPER.$$"
+            notify "aero-helper 编译失败：swiftc -O -o $HELPER $HELPER_SRC"
+            return 1
+        fi
+    fi
+    "$HELPER" "$@"
+}
+
+# 按一下 macOS 的"切换到桌面 N"快捷键（⌥ + 键 $1）。
+# 必须先等 ⇧ 和 ⌥ 都松开：还按着的 ⇧ 会混进来变成 ⌥⇧+键，被 skhd 当成"移动窗口"再次触发。
+# 用 skhd -k 发键：它会发出完整的 ⌥按下/键/⌥松开，系统快捷键才认；只在按键上带 ⌥ 标记是不认的，
+# 那样按键会直接落到当前窗口里打出字符。等不到松开（超过 1 秒）就不发，返回失败。
+press_desktop_key() {
+    helper wait-release shift,option 1 || return 1
+    skhd -k "alt - $1"
+}
+
+# 模拟按 ⌃⌥← / ⌃⌥→（$1 = left / right），触发 macOS 的"向左/右移动一个桌面"。
+# 只补按用户没按着的修饰键（见 helper/main.swift），按住 ⌃ 连按 H 也能连续切换。
+press_step_key() {
+    helper step "$1"
+}
+
+# 等到当前桌面变成 $1（最多约 1.5 秒）
+wait_for_space() {
+    local _
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        [ "$(current_space)" = "$1" ] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------- workspace
+
+workspace_focus() {
+    if [ "$(keys_mode)" = sa ]; then
+        yabai -m space --focus "$1" 2>/dev/null
+        return 0
+    fi
+    # 没有 SA：按一下 macOS 的"切换到桌面 N"快捷键，然后等切换动画结束
+    local idx
+    idx=$(space_index "$1")
+    [ -n "$idx" ] && [ "$idx" -le ${#WORKSPACES[@]} ] || return 1
+    [ "$(current_space)" = "$idx" ] && return 0
+    press_desktop_key "${KEY_NAME[idx - 1]}" || return 1
+    wait_for_space "$idx"
+}
+
+# AeroSpace 的 next/prev：当前显示器上"存在"的工作区（持久的 1-5、有窗口的、当前的），按顺序，不循环
+workspace_step() {
+    # 没有 SA：交给 macOS 的"向左/右移动一个桌面"（⌃⌥←/→）
+    if [ "$(keys_mode)" != sa ]; then
+        case $1 in next) press_step_key right ;; prev) press_step_key left ;; esac
+        return 0
+    fi
+    local target
+    target=$(jq -nr --arg dir "$1" --argjson persistent "$PERSISTENT" \
+        --argjson spaces "$(yabai -m query --spaces --display)" \
+        --argjson windows "$(yabai -m query --windows)" '
+        ([$windows[] | select((."is-sticky" or ."is-minimized") | not) | .space] | unique) as $busy
+        | [$spaces[]
+           | select(."is-native-fullscreen" | not)
+           | select(."has-focus" or .index <= $persistent or (.index as $i | any($busy[]; . == $i)))]
+        | sort_by(.index) as $list
+        | ($list | map(."has-focus") | index(true)) as $i
+        | if $i == null then empty
+          elif $dir == "next" then ($list[$i + 1].index // empty)
+          elif $i > 0 then $list[$i - 1].index
+          else empty end')
+    [ -n "$target" ] && workspace_focus "$target"
+    return 0
+}
+
+cmd_workspace() {
+    case ${1:-} in
+        next | prev) workspace_step "$1" ;;
+        "") return 1 ;;
+        *) workspace_focus "$1" ;;
+    esac
+}
+
+move_window() { # <窗口 id> <桌面编号>：移过去并确认
+    yabai -m window "$1" --space "$2" 2>/dev/null
+    local _
+    for _ in 1 2 3 4 5 6; do
+        [ "$(yabai -m query --windows --window "$1" | jq -r .space)" = "$2" ] && return 0
+        sleep 0.05
+    done
+    return 1
+}
+
+cmd_move_node_to_workspace() {
+    local target=${1:-} follow=${2:-}
+    [ -n "$target" ] || return 1
+
+    # 同一时间只处理一次移动：上一次还没完成时（切桌面动画中）焦点不稳定，再按会移错窗口
+    local lock="$STATE/move.lock"
+    if ! mkdir "$lock" 2>/dev/null; then
+        [ $(($(date +%s) - $(stat -f %m "$lock" 2>/dev/null || echo 0))) -lt 5 ] && return 0
+        rm -rf "$lock"
+        mkdir "$lock" 2>/dev/null || return 0
+    fi
+    trap "rm -rf '$lock'" EXIT   # 定义时就展开成固定路径：退出时函数里的 local 变量已经没了
+
+    local win id dst
+    win=$(yabai -m query --windows --window 2>/dev/null) || return 0
+    id=$(jq -r .id <<<"$win")
+    dst=$(space_index "$target")
+    if [ -z "$dst" ]; then
+        notify "工作区 $target 对应的桌面不存在，请在调度中心里添加桌面"
+        return 1
+    fi
+    if [ "$(jq -r .space <<<"$win")" = "$dst" ]; then
+        return 0
+    fi
+
+    if [ "$follow" = --focus-follows-window ] && [ "$(keys_mode)" != sa ]; then
+        # 没有 SA：先切到目标桌面，再把窗口移过来、聚焦。
+        # 反过来（先移再聚焦）不可靠：原桌面被移空时 macOS 会自己切到别的应用的桌面，和我们抢。
+        workspace_focus "$dst"
+        move_window "$id" "$dst" || { notify "没能把窗口移到工作区 $target"; return 1; }
+        yabai -m window --focus "$id" 2>/dev/null
+        return 0
+    fi
+
+    move_window "$id" "$dst" || { notify "没能把窗口移到工作区 $target"; return 1; }
+    if [ "$follow" = --focus-follows-window ]; then
+        yabai -m space --focus "$dst" 2>/dev/null
+        yabai -m window --focus "$id" 2>/dev/null
+    fi
+    return 0
+}
+
+cmd_move_workspace_to_monitor() {
+    [ "${1:-}" = --wrap-around ] && shift
+    local dir=${1:-next} first=first uuid idx
+    [ "$dir" = prev ] && first=last
+    uuid=$(yabai -m query --spaces --space | jq -r .uuid)
+    yabai -m space --display "$dir" 2>/dev/null || yabai -m space --display "$first" 2>/dev/null || return 0
+    # 焦点跟着工作区走（移动后桌面编号会变，按 uuid 找回来）
+    idx=$(yabai -m query --spaces | jq -r --arg u "$uuid" '.[] | select(.uuid == $u) | .index')
+    [ -n "$idx" ] && yabai -m space --focus "$idx" 2>/dev/null
+    return 0
+}
+
+# ---------------------------------------------------------------- window
+
+cmd_fullscreen() {
+    local win id saved
+    win=$(yabai -m query --windows --window 2>/dev/null) || return 0
+    if [ "$(jq -r '."is-floating"' <<<"$win")" = false ]; then
+        yabai -m window --toggle zoom-fullscreen
+        return 0
+    fi
+    # 浮动窗口：铺满屏幕，再按一次恢复原来的位置和大小
+    id=$(jq -r .id <<<"$win")
+    saved="$STATE/fullscreen-$id"
+    if [ -f "$saved" ]; then
+        local x y w h
+        read -r x y w h <"$saved"
+        rm -f "$saved"
+        yabai -m window "$id" --move "abs:$x:$y"
+        yabai -m window "$id" --resize "abs:$w:$h"
+    else
+        jq -r '.frame | "\(.x|floor) \(.y|floor) \(.w|floor) \(.h|floor)"' <<<"$win" >"$saved"
+        yabai -m window "$id" --grid 1:1:0:0:1:1
+    fi
+}
+
+cmd_resize() {
+    local dim=${1:-} d=${2:-}
+    d=${d#+}
+    [ -n "$dim" ] && [ -n "$d" ] || return 1
+    local win
+    win=$(yabai -m query --windows --window 2>/dev/null) || return 0
+    if [ "$dim" = smart ]; then
+        # smart：父容器横向排列就改宽度，纵向排列就改高度（浮动窗口改宽度）
+        if [ "$(jq -r '."is-floating"' <<<"$win")" = true ]; then
+            dim=width
+        else
+            case $(jq -r '."split-type"' <<<"$win") in
+                vertical) dim=width ;;
+                horizontal) dim=height ;;
+                *) return 0 ;;
+            esac
+        fi
+    fi
+    # 平铺窗口：右/下边有相邻窗口就拖右/下边，否则（贴着屏幕边）反向拖左/上边。
+    # 不能用 `resize right || resize left`：yabai 找不到右边的分隔线时会改拖左边的，方向就反了。
+    local floating
+    floating=$(jq -r '."is-floating"' <<<"$win")
+    case $dim in
+        width)
+            if [ "$floating" = true ] || yabai -m query --windows --window east >/dev/null 2>&1; then
+                yabai -m window --resize "right:$d:0" 2>/dev/null
+            else
+                yabai -m window --resize "left:$((-d)):0" 2>/dev/null
+            fi ;;
+        height)
+            if [ "$floating" = true ] || yabai -m query --windows --window south >/dev/null 2>&1; then
+                yabai -m window --resize "bottom:0:$d" 2>/dev/null
+            else
+                yabai -m window --resize "top:0:$((-d))" 2>/dev/null
+            fi ;;
+    esac
+    return 0
+}
+
+cmd_center() {
+    local win id disp x y
+    win=$(yabai -m query --windows --window ${1:+"$1"} 2>/dev/null) || return 0
+    [ "$(jq -r '."is-floating"' <<<"$win")" = true ] || return 0
+    id=$(jq -r .id <<<"$win")
+    disp=$(yabai -m query --displays --window "$id") || return 0
+    read -r x y < <(jq -nr --argjson w "$win" --argjson d "$disp" \
+        '"\(($d.frame.x + ($d.frame.w - $w.frame.w) / 2) | floor) \(($d.frame.y + ($d.frame.h - $w.frame.h) / 2) | floor)"')
+    yabai -m window "$id" --move "abs:$x:$y"
+}
+
+# 聚焦一个窗口；在别的桌面上就先切过去再聚焦（直接聚焦跨桌面的窗口，macOS 有时不切桌面）
+cmd_focus_window() {
+    local id=${1:-} sp
+    [ -n "$id" ] || return 1
+    yabai -m window "$id" --deminimize 2>/dev/null
+    sp=$(yabai -m query --windows --window "$id" 2>/dev/null | jq -r '.space // empty')
+    [ -n "$sp" ] || return 1
+    [ "$sp" != "$(current_space)" ] && workspace_focus "$sp"
+    yabai -m window --focus "$id" 2>/dev/null
+    return 0
+}
+
+# 记录窗口的使用顺序（yabai 的 window_focused 信号调用），供 ⌥⇥ 窗口切换器排序
+cmd_mru_push() {
+    local id=${1:-} f="$STATE/mru"
+    [ -n "$id" ] || return 0
+    { echo "$id"; grep -vx "$id" "$f" 2>/dev/null; } | head -200 >"$f.$$" && mv "$f.$$" "$f"
+}
+
+cmd_tile_floating() {
+    local id
+    for id in $(yabai -m query --windows --space | jq -r '.[]
+            | select(."is-floating" and .subrole == "AXStandardWindow")
+            | select((."is-minimized" or ."is-hidden" or ."is-sticky") | not)
+            | .id'); do
+        yabai -m window "$id" --toggle float 2>/dev/null
+    done
+    yabai -m space --balance 2>/dev/null
+    return 0
+}
+
+# ---------------------------------------------------------------- config
+
+cmd_reload() {
+    AERO_RELOAD=1 "$HOME/.config/yabai/yabairc" >/dev/null 2>&1
+    skhd --reload 2>/dev/null
+    return 0
+}
+
+set_hotkey() { # <id> <true|false> <ascii> <keycode> <modifiers>
+    defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$1" \
+        "<dict><key>enabled</key><$2/><key>value</key><dict><key>parameters</key><array><integer>$3</integer><integer>$4</integer><integer>$5</integer></array><key>type</key><string>standard</string></dict></dict>"
+}
+
+cmd_keys() { # <auto|sa|native> [--force]（改了 WORKSPACES / 按键后用 --force 重新写系统快捷键）
+    local want=${1:-auto}
+    if [ "$want" = auto ]; then
+        if sudo -n /opt/homebrew/bin/yabai --load-sa >/dev/null 2>&1; then want=sa; else want=native; fi
+    fi
+    case $want in sa | native) ;; *) return 1 ;; esac
+    [ "$(keys_mode)" = "$want" ] && [ "${2:-}" != --force ] && return 0
+
+    local enabled=true i
+    [ "$want" = sa ] && enabled=false
+    for i in "${!WORKSPACES[@]}"; do
+        set_hotkey $((118 + i)) $enabled "${KEY_ASCII[i]}" "${KEY_CODE[i]}" $OPTION  # 切换到桌面 i+1
+    done
+    for ((i = ${#WORKSPACES[@]}; i < MAX_DESKTOP_HOTKEYS; i++)); do
+        set_hotkey $((118 + i)) false 65535 65535 0  # 多出来的桌面不设快捷键
+    done
+    # 向左 / 向右移动一个桌面 = ⌃⌥← / ⌃⌥→（方向键要带 fn 标记 0x800000）。
+    # ⌃H / ⌃L 由 skhd 调 aero，再模拟按 ⌃⌥←/→（见 press_step_key）。
+    set_hotkey 79 $enabled 65535 123 $((CONTROL | OPTION | 0x800000))
+    set_hotkey 81 $enabled 65535 124 $((CONTROL | OPTION | 0x800000))
+    /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u >/dev/null 2>&1
+
+    mkdir -p "$(dirname "$KEYS_LINK")"
+    ln -sfn "$MACOS/skhd/workspaces-$want.skhdrc" "$KEYS_LINK"
+    skhd --reload 2>/dev/null
+    return 0
+}
+
+cmd_spaces() {
+    local n=${#WORKSPACES[@]} have i idx label
+    have=$(yabai -m query --spaces | jq '[.[] | select(."is-native-fullscreen" | not)] | length')
+    if [ "$(keys_mode)" = sa ]; then
+        while [ "$have" -lt "$n" ]; do
+            yabai -m space --create 2>/dev/null || break
+            have=$((have + 1))
+        done
+    elif [ "$have" -lt "$n" ] && [ ! -f "$STATE/notified-spaces" ]; then
+        # 每次开机只提醒一次（添加桌面时会反复重新加载）
+        touch "$STATE/notified-spaces"
+        notify "现在只有 $have 个桌面，工作区需要 $n 个：在调度中心里添加桌面，或运行 setup-sa 自动创建"
+    fi
+    # 先清掉所有标签再重新贴，避免重名
+    for idx in $(yabai -m query --spaces | jq -r '.[] | select(.label != "") | .index'); do
+        yabai -m space "$idx" --label 2>/dev/null
+    done
+    i=0
+    for idx in $(yabai -m query --spaces | jq -r '.[] | select(."is-native-fullscreen" | not) | .index'); do
+        [ "$i" -lt "$n" ] || break
+        label=${WORKSPACES[i]}
+        case $label in [0-9]*) ;; *) yabai -m space "$idx" --label "$label" ;; esac
+        i=$((i + 1))
+    done
+    return 0
+}
+
+cmd_status() {
+    echo "桌面快捷键模式: $(keys_mode)   (sa = yabai 切换 / native = macOS 自带快捷键)"
+    if sudo -n /opt/homebrew/bin/yabai --load-sa >/dev/null 2>&1; then
+        echo "脚本扩展 SA: 已加载"
+    else
+        echo "脚本扩展 SA: 未加载（运行 $HERE/setup-sa）"
+    fi
+    echo "boot-args: $(nvram boot-args 2>/dev/null | cut -f2-)"
+    yabai -m query --spaces | jq -r --argjson ws "$(printf '%s\n' "${WORKSPACES[@]}" | jq -R . | jq -s .)" '.[]
+        | "  桌面 \(.index)\t工作区 \($ws[.index - 1] // "-")\t标签 \(if .label == "" then "-" else .label end)\t窗口 \(.windows | length)\(if ."has-focus" then "\t← 当前" else "" end)"'
+}
+
+case ${1:-} in
+    workspace) shift; cmd_workspace "$@" ;;
+    move-node-to-workspace) shift; cmd_move_node_to_workspace "$@" ;;
+    move-workspace-to-monitor) shift; cmd_move_workspace_to_monitor "$@" ;;
+    fullscreen) cmd_fullscreen ;;
+    resize) shift; cmd_resize "$@" ;;
+    center) shift; cmd_center "$@" ;;
+    tile-floating) cmd_tile_floating ;;
+    focus-window) shift; cmd_focus_window "$@" ;;
+    helper) shift; helper "$@" ;;
+    mru-push) shift; cmd_mru_push "$@" ;;
+    reload) cmd_reload ;;
+    keys) shift; cmd_keys "$@" ;;
+    spaces) cmd_spaces ;;
+    status) cmd_status ;;
+    *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

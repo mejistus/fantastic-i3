@@ -1,0 +1,73 @@
+#!/bin/bash
+# 窗口切换器（yabai 版）
+#   window_switcher --list   立刻弹出所有桌面的窗口列表（⌥⇥）
+#   window_switcher --back   直接切到上一个用过的窗口（back-and-forth）
+#   window_switcher [--auto] 快速按一下 = --back，按住 ⌘ 超过 HOLD_SECONDS = --list（⌘⇥）
+#
+# 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中。打字模糊搜索（输入桌面编号也行），
+#       ↑↓ 或 ⌘⇥ / ⌘⇧⇥ 选择，回车或单击切换，Esc 或再按一次 ⌥⇥ 关闭，
+#       ⌘+ / ⌘- 调字号（会记住），⌘0 恢复默认
+# 窗口使用顺序由 yabai 的 window_focused 信号记录（aero mru-push）；列表界面是 aero-helper switcher。
+# 绑定：skhdrc 中的 alt - tab 和 cmd - tab
+
+HOLD_SECONDS=0.25
+FONT_SIZE=28      # 默认字号（用 ⌘+ / ⌘- 调过之后以调过的为准）
+WIDTH=55          # 列表宽度（屏幕宽度的百分比）
+ROWS=12           # 最多显示几行
+
+export PATH=/opt/homebrew/bin:/usr/bin:/bin
+AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+STATE="/tmp/yabai-aero-$USER"
+mkdir -p "$STATE"
+
+# 列表开着时再按 ⌘⇥ 不重复打开
+lock="$STATE/switcher.lock"
+if ! mkdir "$lock" 2>/dev/null; then
+    kill -0 "$(cat "$lock/pid" 2>/dev/null)" 2>/dev/null && exit 0
+    rm -rf "$lock"
+    mkdir "$lock" 2>/dev/null || exit 0
+fi
+echo $$ >"$lock/pid"
+trap "rm -rf '$lock'" EXIT
+
+mode=${1:---auto}
+case $mode in
+    --auto)
+        # 等 ⌘ 松开，最多 HOLD_SECONDS 秒：松开了就是"快速按一下"
+        if "$AERO" helper wait-release command "$HOLD_SECONDS"; then mode=--back; else mode=--list; fi ;;
+    --list | --back) ;;
+    *) echo "用法：window_switcher [--auto | --list | --back]" >&2; exit 2 ;;
+esac
+
+# 窗口按最近使用排序：上一个用过的在最前，当前窗口在最后
+cur=$(yabai -m query --windows --window 2>/dev/null | jq -r '.id // empty')
+recent=$(yabai -m query --windows --window recent 2>/dev/null | jq -r '.id // empty')
+mru=$(jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' "$STATE/mru" 2>/dev/null || echo '[]')
+rows=$(yabai -m query --windows | jq -r \
+    --argjson sp "$(yabai -m query --spaces)" --argjson mru "$mru" \
+    --arg cur "$cur" --arg recent "$recent" '
+    ($sp | map({key: (.index | tostring), value: (if .label != "" then .label else (.index | tostring) end)}) | from_entries) as $lab
+    | map(select(.role == "AXWindow" and .subrole == "AXStandardWindow" and .app != "choose" and .app != "aero-helper"))
+    | to_entries
+    | map(.key as $k | .value | (.id | tostring) as $id | . + {rank: (
+        if $id == $cur then 1e9
+        elif $id == $recent then -1
+        else ((.id as $i | $mru | index($i)) // (1e6 + $k)) end)})
+    | sort_by(.rank)
+    | .[]
+    | [(.id | tostring), ($lab[.space | tostring] // "?"), .app, .title,
+       (if (.id | tostring) == $cur then "当前" elif ."is-minimized" then "最小化" elif ."is-hidden" then "已隐藏" else "" end),
+       (.pid | tostring)]
+    | @tsv')
+[ -n "$rows" ] || exit 0
+prev=$(head -n1 <<<"$rows" | cut -f1)
+
+if [ "$mode" = --back ]; then
+    [ "$prev" != "$cur" ] && "$AERO" focus-window "$prev"
+    exit 0
+fi
+
+# 列表按桌面编号排序；同一桌面内保持最近使用的顺序（稳定排序）；默认选中上一个用过的窗口
+id=$(sort -s -t $'\t' -k2,2n <<<"$rows" |
+    "$AERO" helper switcher --select "$prev" --font-size "$FONT_SIZE" --width "$WIDTH" --rows "$ROWS") || exit 0
+[ -n "$id" ] && "$AERO" focus-window "$id"

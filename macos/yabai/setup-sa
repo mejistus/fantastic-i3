@@ -1,0 +1,60 @@
+#!/bin/bash
+# 开启 yabai 脚本扩展（SA）—— 在自己的终端里运行一次，会要求输入密码。
+# yabai 升级后需要再运行一次（sudoers 里记录的是 yabai 程序的校验值）。
+#
+# SA 带来：瞬间切换工作区（无动画）、自动创建 10 个桌面、把工作区移到其他显示器。
+# （移动窗口到其他工作区不需要 SA。）
+# 做的事：
+#   1. 检查 SIP 是否已按 yabai 要求部分关闭（这一步只能在恢复模式里做，脚本不会改）
+#   2. Apple Silicon：设置启动参数 -arm64e_preview_abi（改了需要重启）
+#   3. 写入 /private/etc/sudoers.d/yabai，允许免密码执行 `sudo yabai --load-sa`
+set -euo pipefail
+
+YABAI=/opt/homebrew/bin/yabai
+AERO="$(cd "$(dirname "$0")" && pwd)/aero"
+
+sip=$(csrutil status)
+if ! grep -q 'Filesystem Protections: disabled' <<<"$sip" || ! grep -q 'Debugging Restrictions: disabled' <<<"$sip"; then
+    echo "SIP 还没有部分关闭。请重启进入恢复模式，在终端运行："
+    echo "    csrutil enable --without fs --without debug --without nvram"
+    echo "重启回来后再运行本脚本。"
+    exit 1
+fi
+echo "✓ SIP 已部分关闭"
+
+need_reboot=0
+if [ "$(uname -m)" = arm64 ]; then
+    args=$(nvram boot-args 2>/dev/null | cut -f2- || true)
+    if grep -q -- '-arm64e_preview_abi' <<<"$args"; then
+        echo "✓ 启动参数已包含 -arm64e_preview_abi"
+    else
+        sudo nvram boot-args="${args:+$args }-arm64e_preview_abi"
+        echo "✓ 已设置启动参数 -arm64e_preview_abi（需要重启）"
+        need_reboot=1
+    fi
+fi
+
+hash=$(shasum -a 256 "$YABAI" | cut -d' ' -f1)
+tmp=$(mktemp)
+echo "$(whoami) ALL=(root) NOPASSWD: sha256:$hash $YABAI --load-sa" >"$tmp"
+sudo visudo -cf "$tmp" >/dev/null
+sudo install -m 0440 -o root -g wheel "$tmp" /private/etc/sudoers.d/yabai
+rm -f "$tmp"
+echo "✓ 已写入 /private/etc/sudoers.d/yabai"
+
+if [ "$need_reboot" = 1 ]; then
+    echo
+    echo "请重启电脑。登录后 yabai 会自动加载 SA、创建 10 个桌面，并把快捷键切换到 yabai。"
+    exit 0
+fi
+
+if sudo -n "$YABAI" --load-sa; then
+    "$AERO" keys auto
+    "$AERO" spaces
+    "$AERO" reload
+    echo "✓ SA 已加载"
+    "$AERO" status
+else
+    echo "SA 加载失败，请重启电脑后再运行一次本脚本。"
+    exit 1
+fi

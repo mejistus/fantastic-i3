@@ -1,4 +1,32 @@
 #!/usr/bin/env bash
+# ⌥D：把一个 Finder 窗口拿到当前工作区并聚焦；一个 Finder 窗口都没有就新开一个。
+# yabai 和 AeroSpace 都支持（看哪个在运行）。
+
+if pgrep -xq yabai; then
+    YABAI=/opt/homebrew/bin/yabai
+    JQ=/opt/homebrew/bin/jq
+    cur=$("$YABAI" -m query --spaces --space | "$JQ" -r .index)
+    # 优先用当前工作区上的 Finder 窗口
+    id=$("$YABAI" -m query --windows | "$JQ" -r --argjson cur "$cur" '
+        [.[] | select(.app == "Finder" and .subrole == "AXStandardWindow" and (."is-minimized" | not))]
+        | (map(select(.space == $cur)) + .)[0].id // empty')
+    if [ -n "$id" ]; then
+        "$YABAI" -m window "$id" --space "$cur" 2>/dev/null
+        for _ in 1 2 3 4 5; do
+            if [ "$("$YABAI" -m query --windows --window "$id" | "$JQ" -r .space)" = "$cur" ]; then
+                "$YABAI" -m window --focus "$id"
+                exit 0
+            fi
+            sleep 0.05
+        done
+    fi
+    # 没有 Finder 窗口，或者没有 SA 移不过来：直接在当前工作区新开一个
+    osascript -e 'tell application "Finder" to make new Finder window' \
+              -e 'tell application "Finder" to activate'
+    exit 0
+fi
+
+# ---- AeroSpace ----
 APP=${1:-Finder}
 WINDOW_ID=$(aerospace list-windows --all --format "%{window-id} %{app-name}" | grep " Finder" | head -n1 | cut -d" " -f1)
 WORKSPACE_ID=$(aerospace list-workspaces --focused)
