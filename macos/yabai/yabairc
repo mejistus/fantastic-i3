@@ -1,0 +1,157 @@
+#!/usr/bin/env sh
+# yabai 配置 —— 从 AeroSpace 迁移（../aerospace/aerospace.toml），行为与原配置保持一致。
+# 链接到 ~/.config/yabai/yabairc。快捷键在 ../skhd/skhdrc，AeroSpace 命令的模拟在 ./aero。
+#
+# 工作区 = macOS 桌面，编号 1-10（⌥1 … ⌥9 ⌥0 切换，⌥⇧+数字 把窗口移过去）。
+# aerospace.toml 里的字母工作区已改成数字，规则按原来所在的桌面位置换算：
+#   B → 6（聊天 / 影音）  C → 7（AI）  N → 8（笔记）  T → 9（终端）  X → 10（系统设置）
+#   Z（浏览器、Chrome、腾讯会议、知乎）→ 不自动分配，在哪个工作区打开就留在哪里
+#
+# 需要 yabai 脚本扩展（SA）的功能：瞬间切换工作区（无动画）、自动创建 10 个桌面、把工作区移到其他显示器。
+# 没有 SA 时切换工作区改用 macOS 自带的桌面快捷键（有动画），桌面要自己在调度中心里加够 10 个；
+# 移动窗口到其他工作区（⌥⇧+数字、下面规则里的工作区分配）不需要 SA。
+# 开启 SA：运行 ./setup-sa（只需一次；yabai 升级后再运行一次）。
+
+AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+
+# aero reload 会重新执行本文件：先清掉旧的规则和信号
+while yabai -m rule --remove 0 2>/dev/null; do :; done
+while yabai -m signal --remove 0 2>/dev/null; do :; done
+
+# ---- 脚本扩展 + 桌面快捷键模式（Dock 重启后 SA 会掉，需要重新加载）----
+yabai -m signal --add event=dock_did_restart action="$AERO keys auto"
+"$AERO" keys auto
+
+# 关掉 macOS 自带的 ⌘⇥ 应用切换器，把 ⌘⇥ 交给 skhd（窗口切换器）；重新登录后会恢复，所以每次启动都执行
+"$AERO" helper native-cmd-tab off
+
+# 记录窗口的使用顺序，⌥⇥ 窗口切换器按它排序（上一个用过的窗口排第一）
+yabai -m signal --add event=window_focused action="$AERO mru-push \$YABAI_WINDOW_ID"
+
+# 在调度中心里添加 / 删除桌面后，重新登记规则（规则里的工作区在登记时才确定）
+yabai -m signal --add event=space_created action="$AERO reload"
+yabai -m signal --add event=space_destroyed action="$AERO reload"
+
+# ---- 布局：tiles，横向根容器，间距 2 ----
+yabai -m config layout                bsp
+yabai -m config split_type            vertical      # 新窗口都并排成列（AeroSpace 宽屏的 horizontal 容器）
+yabai -m config window_placement      second_child  # 新窗口放在当前窗口右边
+yabai -m config auto_balance          y-axis        # 各列等宽（AeroSpace 新窗口平分宽度；y-axis = 平衡竖直分隔线）
+yabai -m config split_ratio           0.50
+yabai -m config top_padding           2
+yabai -m config bottom_padding        2
+yabai -m config left_padding          2
+yabai -m config right_padding         2
+yabai -m config window_gap            2
+yabai -m config mouse_follows_focus   off           # on-focused-monitor-changed = []
+yabai -m config focus_follows_mouse   off
+yabai -m config window_origin_display focused       # 新窗口出现在当前显示器
+# AeroSpace 没有的小功能：按住 fn 左键拖动 = 移动窗口，右键拖动 = 调整大小（fn 不与任何软件冲突）
+yabai -m config mouse_modifier        fn
+yabai -m config mouse_action1         move
+yabai -m config mouse_action2         resize
+yabai -m config mouse_drop_action     swap
+
+# ---- 工作区（10 个桌面始终存在）----
+"$AERO" spaces
+
+# ---- [[on-window-detected]] ----
+# rule <工作区|-> <条件 与 属性…>
+#   layout floating → manage=off    layout tiling → manage=on    move-node-to-workspace X → 第一个参数 X
+# center <条件…>
+#   exec-and-forget center-window → 浮动窗口出现时居中
+#
+# 与 AeroSpace 的差别及处理：
+#   · AeroSpace 用 bundle id 匹配，yabai 只能用应用名：下面写的是本机（繁体中文系统）显示的名字，
+#     系统应用同时写了英文 / 繁体 / 简体名。
+#   · AeroSpace 只执行第一条匹配的规则；yabai 会执行所有匹配的规则。按应用名的规则互不重叠，
+#     按标题的规则（Figure / python / Hugging Face）会自动排除前面已经有规则的应用（$TAKEN），
+#     结果与 AeroSpace 相同。
+#   · 原来按标题匹配 Cursor / Code / Trae 的三条规则改成按应用名匹配，避免误伤标题里带这些词的其他窗口。
+#   · 目标桌面不存在时（没有 SA 且桌面不够），规则仍然生效，只是不移动窗口。
+TAKEN=''
+rule() {
+    space=$1
+    shift
+    case " $* " in
+        *" title="*) ;;
+        *) for arg in "$@"; do
+               case $arg in app=*) TAKEN="${TAKEN:+$TAKEN|}${arg#app=}" ;; esac
+           done ;;
+    esac
+    if [ "$space" != - ] && yabai -m query --spaces --space "$space" >/dev/null 2>&1; then
+        yabai -m rule --add "$@" space="$space"
+    else
+        yabai -m rule --add "$@"
+    fi
+}
+center() {
+    yabai -m signal --add event=window_created action="$AERO center \$YABAI_WINDOW_ID" "$@"
+}
+TILE='subrole=^AXStandardWindow$'   # 强制平铺只针对普通窗口，对话框 / 弹窗照常浮动
+
+# 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ 窗口切换列表
+rule - app='^(Calculator|計算機|计算器|Archive Utility|封存工具程式|归档实用工具)$' manage=off
+rule - app='^(Stats|BetterDisplay|Mos|Raycast|Dropover|Snipaste|iShot|iBar|AltTab|Wins|choose|aero-helper)$' manage=off
+rule - app='^(超級右鍵|超级右键|iRightMouse)' manage=off
+
+# 以下顺序与 aerospace.toml 相同
+rule 6 app='^(Microsoft Outlook|Outlook)$' manage=off
+center app='^(Microsoft Outlook|Outlook)$'
+rule 6 app='^(百度网盘|百度網盤|BaiduNetdisk.*)$' manage=off                 # com.baidu.netdisk / BaiduNetdisk-mac
+rule - app='^([Hh]armony[Oo][Ss]|鸿蒙|鴻蒙)' manage=off                      # com.HarmonyOSInterconnection.app
+rule - app='^Google Chrome$' manage=off
+rule - app='^(Cherry Studio|CherryStudio)$' manage=off
+center app='^(Cherry Studio|CherryStudio)$'
+rule 6 app='^(WeChat|微信)$' title='^(微信|WeChat)$' manage=off
+center app='^(WeChat|微信)$' title='^(微信|WeChat)$'
+rule 3 app='^Microsoft PowerPoint$' manage=off
+rule 1 app='^Microsoft Word$' manage=off
+rule 2 app='^Microsoft Excel$' manage=off
+rule - app='^(TencentMeeting|腾讯会议|騰訊會議)$' manage=off
+rule - app='^QQ$' manage=off
+rule - app='^Finder$' manage=off
+rule - app='^(闪电说|閃電說)' manage=off                                    # cn.shandianshuo.desktop
+rule - app='^Clash Verge' manage=off
+rule 9 app='^kitty$' manage=off
+center app='^kitty$'
+rule 9 app='^iTerm2$' "$TILE" manage=on
+rule 6 app='^(哔哩哔哩|嗶哩嗶哩|bilibili)$' manage=off
+rule 6 app='^(QQMusic|QQ音乐|QQ音樂)$' manage=off
+rule 7 app='^Claude$' "$TILE" manage=on
+rule 7 app='^Google Gemini' manage=off
+rule 7 app='^ChatGPT$' "$TILE" manage=on
+rule - app='^Cursor$' "$TILE" manage=on
+rule - app='^(Code|Visual Studio Code)$' "$TILE" manage=on
+rule 7 app='^(TRAE|Trae|Trae CN)$' "$TILE" manage=on
+rule - app='^(小红书|X)$' "$TILE" manage=on
+rule - app='^知乎$' "$TILE" manage=on
+rule - app='^(Calendar|行事曆|日历)$' manage=off
+rule - app='^(Activity Monitor|活動監視器|活动监视器)$' manage=off
+center app='^(Activity Monitor|活動監視器|活动监视器)$'
+rule - app='^(Preview|預覽程式|预览)$' manage=off
+rule - app='^Photo Booth$' manage=off
+rule - app='^App Store$' manage=off
+rule - title='^(Figure*)' app!="$TAKEN" manage=off
+rule - title='^(python*)' app!="$TAKEN" manage=off
+rule 9 app='^(Terminal|終端機|终端)$' manage=off
+rule 8 app='^(Notes|備忘錄|备忘录)$' manage=off
+rule 8 app='^Typora$' manage=off
+rule 8 app='^Obsidian$' manage=off
+rule 8 app='^Notion$' manage=off
+rule 8 app='^Zotero$' manage=off   # aerospace.toml 里 Zotero 主窗口平铺的那条排在这条后面，从未生效，这里保持一致
+rule 6 app='^(Douyin|抖音)$' manage=off
+rule 6 app='^Spotify$' manage=off
+rule 6 app='^(Music|音樂|音乐)$' manage=off
+rule - app='^(Safari|Safari浏览器)$' manage=off
+rule - app='^Microsoft Edge$' manage=off
+rule - app='^Arc$' manage=off
+rule - app='^Brave Browser$' manage=off
+rule - app='^Firefox$' manage=off
+rule - title='(Hugging Face|ModelScope|魔搭)' app!="$TAKEN" manage=off
+rule 10 app='^(System Settings|系統設定|系统设置)$' manage=off
+
+# 启动时对已经打开的窗口也执行一遍规则（aero reload 时不执行，不打乱现有窗口）
+[ -n "${AERO_RELOAD:-}" ] || yabai -m rule --apply
+
+echo "yabai configuration loaded"

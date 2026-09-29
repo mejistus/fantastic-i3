@@ -1,0 +1,100 @@
+# skhd 快捷键 —— 与 aerospace.toml 的 [mode.*.binding] 一一对应（yabai 版）
+# 链接到 ~/.config/skhd/skhdrc；aero 是 ../yabai/aero，用来模拟 AeroSpace 的命令。
+#
+# 切换工作区（⌥1 … ⌥9 ⌥0 = 工作区 1 … 10）和 ⌃H/⌃L 在文件末尾 .load 的 workspaces.skhdrc 里：
+# 它由 aero keys 按 SA 是否可用，链接到 workspaces-sa.skhdrc 或 workspaces-native.skhdrc。
+
+:: default
+:: resize
+:: service
+
+# ================================================================ mode.main
+
+# focus left/down/up/right
+alt - h     : yabai -m window --focus west
+alt - j     : yabai -m window --focus south
+alt - k     : yabai -m window --focus north
+alt - l     : yabai -m window --focus east
+alt - left  : yabai -m window --focus west
+alt - down  : yabai -m window --focus south
+alt - up    : yabai -m window --focus north
+alt - right : yabai -m window --focus east
+
+# move left/down/up/right
+alt + shift - h : yabai -m window --swap west
+alt + shift - j : yabai -m window --swap south
+alt + shift - k : yabai -m window --swap north
+alt + shift - l : yabai -m window --swap east
+
+# fullscreen / layout floating tiling
+alt - f         : $HOME/Documents/fantastic-i3/macos/yabai/aero fullscreen
+alt + shift - f : yabai -m window --toggle float
+
+# resize smart -50 / +50（⌥- ⌥=）
+alt - 0x1B : $HOME/Documents/fantastic-i3/macos/yabai/aero resize smart -50
+alt - 0x18 : $HOME/Documents/fantastic-i3/macos/yabai/aero resize smart +50
+
+# ⌥⇧1 … ⌥⇧9 ⌥⇧0：把当前窗口移到工作区 1 … 10，并跟过去
+alt + shift - 1 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 1 --focus-follows-window
+alt + shift - 2 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 2 --focus-follows-window
+alt + shift - 3 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 3 --focus-follows-window
+alt + shift - 4 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 4 --focus-follows-window
+alt + shift - 5 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 5 --focus-follows-window
+alt + shift - 6 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 6 --focus-follows-window
+alt + shift - 7 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 7 --focus-follows-window
+alt + shift - 8 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 8 --focus-follows-window
+alt + shift - 9 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 9 --focus-follows-window
+alt + shift - 0 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 10 --focus-follows-window
+
+# move-workspace-to-monitor --wrap-around next
+alt + shift - tab : $HOME/Documents/fantastic-i3/macos/yabai/aero move-workspace-to-monitor --wrap-around next
+
+# 窗口切换器
+#   ⌥⇥：立刻弹出窗口列表
+#   ⌘⇥：快速按一下 = 回到上一个用过的窗口；按住 ⌘ = 弹出列表（macOS 自带的 ⌘⇥ 应用切换器由 yabairc 关掉了）
+# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：再按 ⌥⇥ 关闭列表，⌘⇥ 在列表里往下选
+alt - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --list
+cmd - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --auto
+.blacklist [
+    "aero-helper"
+]
+
+# 当前工作区开 Finder / 跳到 Safari
+alt - d   : $HOME/Documents/fantastic-i3/macos/new_window_here
+alt - g   : $HOME/Documents/fantastic-i3/macos/yabai/focus_safari
+
+# mode resize / mode service
+alt - r  ; resize
+ctrl - s ; service
+
+# ================================================================ mode.service
+# skhd 的一个按键不能同时"执行命令 + 切换模式"：命令最后用 skhd -k "f20" 回到 default
+
+service < escape : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero reload
+service < r      ; resize
+service < f      : $HOME/Documents/fantastic-i3/macos/yabai/aero tile-floating
+service < space  ; default
+service < j      : yabai -m window --toggle split; skhd -k "f20"
+service < h      : yabai -m window --insert east; skhd -k "f20"
+service < v      : yabai -m window --insert south; skhd -k "f20"
+service < f20    ; default
+
+# ================================================================ mode.resize
+
+resize < 0x1B  : $HOME/Documents/fantastic-i3/macos/yabai/aero resize smart -50
+resize < 0x18  : $HOME/Documents/fantastic-i3/macos/yabai/aero resize smart +50
+resize < h     : $HOME/Documents/fantastic-i3/macos/yabai/aero resize width -50
+resize < j     : $HOME/Documents/fantastic-i3/macos/yabai/aero resize height +50
+resize < k     : $HOME/Documents/fantastic-i3/macos/yabai/aero resize height -50
+resize < l     : $HOME/Documents/fantastic-i3/macos/yabai/aero resize width +50
+resize < left  : $HOME/Documents/fantastic-i3/macos/yabai/aero resize width -50
+resize < up    : $HOME/Documents/fantastic-i3/macos/yabai/aero resize height +50
+resize < down  : $HOME/Documents/fantastic-i3/macos/yabai/aero resize height -50
+resize < right : $HOME/Documents/fantastic-i3/macos/yabai/aero resize width +50
+resize < return ; default
+resize < escape ; default
+resize < space  ; default
+
+# ================================================================ 工作区切换
+
+.load "workspaces.skhdrc"
