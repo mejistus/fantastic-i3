@@ -36,9 +36,26 @@ For examples, to activate #2 style which has a CPU monitor, just run `python ~/.
 ## Customed Nvchad (Neovim)
 
 Have a good look at the mappings.lua file, Combine qutebrowser to free your mouse and neck~ (Code hover keys I modified to 'F'.Press Shift-f twice to look up).
+These lua config was written by Claude Code mostly.
 
 ![1751286279192](image/README/1751286279192.png)
 
 ## lighdm-slick-greater
 
 Maybe you want it.
+
+## Unified macOS Tahoe Dark Theme
+
+GTK2/3/4 + Qt5/6 + fcitx5 + rofi unified to MacTahoe dark on i3/X11.
+Details and apply steps: see [THEME.md](THEME.md) (`install.sh` installs the deps).
+
+Bugs fixed along the way: stale xsettingsd broadcast overriding themes,
+missing `MacTahoe-Dark` falling back to light Adwaita, KDE apps bypassing
+qt6ct icons via kdeglobals, qt6ct custom palette covering Kvantum dark colors,
+statically-linked Qt apps (WeChat) marked as unthemeable, plus a hybrid
+fcitx5 `wechat-dark-menu` theme (WeChat panel + dark menus).
+
+Theme config was corrected and bugs fixed with Muse Spark 1.3 Free and
+DeepSeek 4.1 Flash.
+
+Thanks to free software and free models.
