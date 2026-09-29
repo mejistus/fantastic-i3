@@ -5,7 +5,7 @@
  *******************************************************************************/
 
 * {
-    font:   "MesloLGS NF 16";
+    font:   "PingFang SC 12";
 
     bg0:    #242424E6;
     bg1:    #7E7E7E80;
@@ -32,7 +32,7 @@ window {
 }
 
 inputbar {
-    font:   "MesloLGS NF 18";
+    font:       "PingFang SC 16";
     padding:    12px;
     spacing:    12px;
     children:   [ icon-search, entry ];
