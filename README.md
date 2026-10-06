@@ -68,7 +68,7 @@ The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somew
 | ⌥⇧1 … ⌥⇧0 | Move the window to that workspace and follow it |
 | ⌃H / ⌃L | Previous / next workspace |
 | ⌥H/J/K/L, ⌥⇧H/J/K/L | Focus / swap left, down, up, right |
-| ⌥ + arrow, ⌘⇧ + arrow | Focus / swap by arrow keys (⌘⇧ + arrow replaces the system's select-to-line/document-edge shortcut) |
+| ⌥ or ⌘ + arrow, ⌘⇧ + arrow | Focus / swap by arrow keys. The ⌘ versions replace the system's move/select-to-line/document-edge shortcuts and browser back/forward |
 | ⌥F / ⌥⇧F | Fullscreen / toggle floating |
 | ⌥- / ⌥= | Shrink / grow the window |
 | ⌘⇥ | Tap: previous window. Hold ⌘: window list, which switches to the English keyboard layout so you can type to search. Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
