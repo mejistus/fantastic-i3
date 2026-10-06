@@ -3,9 +3,10 @@
 # 链接到 ~/.config/yabai/yabairc。快捷键在 ../skhd/skhdrc，AeroSpace 命令的模拟在 ./aero。
 #
 # 工作区 = macOS 桌面，编号 1-10（⌥1 … ⌥9 ⌥0 切换，⌥⇧+数字 把窗口移过去）。
-# aerospace.toml 里的字母工作区已改成数字，规则按原来所在的桌面位置换算：
-#   B → 6（聊天 / 影音）  C → 7（AI）  N → 8（笔记）  T → 9（终端）  X → 10（系统设置）
-#   Z（浏览器、Chrome、腾讯会议、知乎）→ 不自动分配，在哪个工作区打开就留在哪里
+# aerospace.toml 里的字母工作区已改成数字，规则按原来所在的桌面位置换算，个别应用另有指定：
+#   B → 6（影音 / 网盘 / Outlook）  C → 7（AI）  N → 8（笔记）  X → 10（系统设置）
+#   终端（iTerm2 / kitty / Terminal）→ 5    腾讯会议 → 9    微信 → 10（主窗口平铺）
+#   Z 里的其他应用（浏览器、Chrome、知乎）→ 不自动分配，在哪个工作区打开就留在哪里
 #
 # 需要 yabai 脚本扩展（SA）的功能：瞬间切换工作区（无动画）、自动创建 10 个桌面、把工作区移到其他显示器。
 # 没有 SA 时切换工作区改用 macOS 自带的桌面快捷键（有动画），桌面要自己在调度中心里加够 10 个；
@@ -25,7 +26,7 @@ yabai -m signal --add event=dock_did_restart action="$AERO keys auto"
 # 关掉 macOS 自带的 ⌘⇥ 应用切换器，把 ⌘⇥ 交给 skhd（窗口切换器）；重新登录后会恢复，所以每次启动都执行
 "$AERO" helper native-cmd-tab off
 
-# 记录窗口的使用顺序，⌥⇥ 窗口切换器按它排序（上一个用过的窗口排第一）
+# 记录窗口的使用顺序，⌘⇥ 窗口切换器按它排序（上一个用过的窗口排第一）
 yabai -m signal --add event=window_focused action="$AERO mru-push \$YABAI_WINDOW_ID"
 
 # 在调度中心里添加 / 删除桌面后，重新登记规则（规则里的工作区在登记时才确定）
@@ -53,6 +54,12 @@ yabai -m config mouse_action2         resize
 yabai -m config mouse_drop_action     swap
 
 # ---- 工作区（10 个桌面始终存在）----
+# 开机登录时 yabai 刚启动的几秒里查询会返回残缺的 JSON：先等它能正常回答，最多 5 秒。
+# 否则下面的规则会因为"查不到桌面"而被登记成不带工作区的（应用不再自动去自己的工作区）。
+for _ in $(seq 50); do
+    yabai -m query --spaces 2>/dev/null | jq -e 'length > 0' >/dev/null 2>&1 && break
+    sleep 0.1
+done
 "$AERO" spaces
 
 # ---- [[on-window-detected]] ----
@@ -90,7 +97,7 @@ center() {
 }
 TILE='subrole=^AXStandardWindow$'   # 强制平铺只针对普通窗口，对话框 / 弹窗照常浮动
 
-# 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ 窗口切换列表
+# 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌘⇥ 窗口切换列表
 rule - app='^(Calculator|計算機|计算器|Archive Utility|封存工具程式|归档实用工具)$' manage=off
 rule - app='^(Stats|BetterDisplay|Mos|Raycast|Dropover|Snipaste|iShot|iBar|AltTab|Wins|choose|aero-helper)$' manage=off
 rule - app='^(超級右鍵|超级右键|iRightMouse)' manage=off
@@ -103,19 +110,22 @@ rule - app='^([Hh]armony[Oo][Ss]|鸿蒙|鴻蒙)' manage=off                     
 rule - app='^Google Chrome$' manage=off
 rule - app='^(Cherry Studio|CherryStudio)$' manage=off
 center app='^(Cherry Studio|CherryStudio)$'
-rule 6 app='^(WeChat|微信)$' title='^(微信|WeChat)$' manage=off
-center app='^(WeChat|微信)$' title='^(微信|WeChat)$'
+# 微信：所有窗口都去工作区 10，主窗口平铺，其他窗口（聊天小窗、图片、朋友圈…）浮动。
+# 按应用名分配工作区，不按标题：主窗口刚出现时标题可能还是空的，规则只在窗口出现的那一刻匹配一次。
+rule 10 app='^(WeChat|微信)$'
+rule - app='^(WeChat|微信)$' title!='^(微信|WeChat)?$' manage=off
+yabai -m signal --add event=window_created app='^(WeChat|微信)$' action="$AERO float-fixed \$YABAI_WINDOW_ID"  # 扫码登录窗口也叫"微信"，但不能调整大小
 rule 3 app='^Microsoft PowerPoint$' manage=off
 rule 1 app='^Microsoft Word$' manage=off
 rule 2 app='^Microsoft Excel$' manage=off
-rule - app='^(TencentMeeting|腾讯会议|騰訊會議)$' manage=off
+rule 9 app='^(TencentMeeting|腾讯会议|騰訊會議)$' manage=off
 rule - app='^QQ$' manage=off
 rule - app='^Finder$' manage=off
 rule - app='^(闪电说|閃電說)' manage=off                                    # cn.shandianshuo.desktop
 rule - app='^Clash Verge' manage=off
-rule 9 app='^kitty$' manage=off
+rule 5 app='^kitty$' manage=off
 center app='^kitty$'
-rule 9 app='^iTerm2$' "$TILE" manage=on
+rule 5 app='^iTerm2$' "$TILE" manage=on
 rule 6 app='^(哔哩哔哩|嗶哩嗶哩|bilibili)$' manage=off
 rule 6 app='^(QQMusic|QQ音乐|QQ音樂)$' manage=off
 rule 7 app='^Claude$' "$TILE" manage=on
@@ -134,7 +144,7 @@ rule - app='^Photo Booth$' manage=off
 rule - app='^App Store$' manage=off
 rule - title='^(Figure*)' app!="$TAKEN" manage=off
 rule - title='^(python*)' app!="$TAKEN" manage=off
-rule 9 app='^(Terminal|終端機|终端)$' manage=off
+rule 5 app='^(Terminal|終端機|终端)$' manage=off
 rule 8 app='^(Notes|備忘錄|备忘录)$' manage=off
 rule 8 app='^Typora$' manage=off
 rule 8 app='^Obsidian$' manage=off

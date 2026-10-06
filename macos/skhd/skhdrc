@@ -49,11 +49,9 @@ alt + shift - 0 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-wor
 # move-workspace-to-monitor --wrap-around next
 alt + shift - tab : $HOME/Documents/fantastic-i3/macos/yabai/aero move-workspace-to-monitor --wrap-around next
 
-# 窗口切换器
-#   ⌥⇥：立刻弹出窗口列表
-#   ⌘⇥：快速按一下 = 回到上一个用过的窗口；按住 ⌘ = 弹出列表（macOS 自带的 ⌘⇥ 应用切换器由 yabairc 关掉了）
-# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：再按 ⌥⇥ 关闭列表，⌘⇥ 在列表里往下选
-alt - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --list
+# 窗口切换器（⌘⇥；macOS 自带的 ⌘⇥ 应用切换器由 yabairc 关掉了）
+#   快速按一下 = 回到上一个用过的窗口；按住 ⌘ = 弹出列表（同时切到英文输入法，打字直接搜索）
+# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：⌘⇥ 在列表里往下选，Esc 关闭
 cmd - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --auto
 .blacklist [
     "aero-helper"

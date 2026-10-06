@@ -44,6 +44,42 @@ These lua config was written by Claude Code mostly.
 
 Maybe you want it.
 
+## macOS: yabai + skhd
+
+`macos/` holds an i3-style tiling setup for macOS: yabai manages windows and skhd handles keys. There are ten numbered workspaces, one per macOS desktop.
+
+Install on Apple Silicon:
+
+```
+git clone https://github.com/mejistus/fantastic-i3 ~/Documents/fantastic-i3
+bash ~/Documents/fantastic-i3/macos/install.sh
+```
+
+The script is safe to rerun. It installs yabai, skhd and jq with Homebrew, links the configs into `~/.config` and builds the window switcher. It also turns off "Automatically rearrange Spaces based on most recent use" and starts both services. At the end it lists what's left to do by hand:
+
+- Give yabai and skhd Accessibility access (System Settings → Privacy & Security → Accessibility), then rerun the script.
+- Add desktops in Mission Control until there are 10.
+
+The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somewhere else, the script creates that path as a link to your clone.
+
+| Key | Action |
+|---|---|
+| ⌥1 … ⌥9, ⌥0 | Go to workspace 1 … 10 |
+| ⌥⇧1 … ⌥⇧0 | Move the window to that workspace and follow it |
+| ⌃H / ⌃L | Previous / next workspace |
+| ⌥H/J/K/L, ⌥⇧H/J/K/L | Focus / swap left, down, up, right |
+| ⌥F / ⌥⇧F | Fullscreen / toggle floating |
+| ⌥- / ⌥= | Shrink / grow the window |
+| ⌘⇥ | Tap: previous window. Hold ⌘: window list, which switches to the English keyboard layout so you can type to search |
+| ⌥R / ⌃S | Resize mode / service mode |
+| ⌥D | Bring a Finder window to this workspace, or open one |
+| ⌥G | Jump to Safari, or open a window |
+| ⌥⇧⇥ | Move the workspace to the next monitor (needs the scripting addition) |
+
+Without the scripting addition, workspaces switch with macOS's slide animation. Instant switching needs yabai's scripting addition, which requires partly disabling SIP. In Recovery, run `csrutil enable --without fs --without debug --without nvram`. Then run `macos/yabai/setup-sa`, and reboot if it asks. Run `setup-sa` again after every yabai upgrade. On macOS 15 it also patches yabai's loader so it can inject into the Dock ([yabai#2686](https://github.com/asmvik/yabai/issues/2686)).
+
+To troubleshoot, run `macos/yabai/aero status`. Failed ⌥⇧N moves are logged to `/tmp/yabai-aero-$USER/aero.log`.
+
 ## Unified macOS Tahoe Dark Theme
 
 GTK2/3/4 + Qt5/6 + fcitx5 + rofi unified to MacTahoe dark on i3/X11.
