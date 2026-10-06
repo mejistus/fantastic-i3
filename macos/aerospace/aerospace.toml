@@ -40,13 +40,13 @@ on-focused-monitor-changed = []
 # You can effectively turn off macOS "Hide application" (cmd-h) feature by toggling this flag
 # Useful if you don't use this macOS feature, but accidentally hit cmd-h or cmd-alt-h key
 # Also see: https://nikitabobko.github.io/AeroSpace/goodies#disable-hide-app
-automatically-unhide-macos-hidden-apps = true
+# automatically-unhide-macos-hidden-apps = true
 
 # List of workspaces that should stay alive even when they contain no windows,
 # even when they are invisible.
 # This config version is only available since 'config-version = 2'
 # Fallback value (if you omit the key): persistent-workspaces = []
-persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+persistent-workspaces = ["1", "2", "3", "4", "5"]
 
 # A callback that runs every time binding mode changes
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
@@ -109,7 +109,7 @@ on-mode-changed = []
     # (like in i3)
 
     alt-g = ['''exec-and-forget bash -lc '
-  ws=2
+  ws=Z
   safari_bid="com.apple.Safari"
   aerospace workspace "$ws"
   if [ "$(aerospace list-windows --workspace "$ws" --app-bundle-id "$safari_bid" --count)" -eq 0 ]; then
@@ -126,6 +126,7 @@ on-mode-changed = []
     alt-t = 'workspace T'
     alt-b = 'workspace B'
     alt-c = 'workspace C'
+    alt-n = 'workspace N'
     alt-z = 'workspace Z'
     alt-x = 'workspace X'
     # alt-x = 'workspace --auto-back-and-forth X'
@@ -159,11 +160,7 @@ on-mode-changed = []
     alt-3 = 'workspace 3'
     alt-4 = 'workspace 4'
     alt-5 = 'workspace 5'
-    alt-6 = 'workspace 6'
-    alt-7 = 'workspace 7'
-    alt-8 = 'workspace 8'
-    alt-9 = 'workspace 9'
-    alt-0 = 'workspace 10'
+
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-node-to-workspace
     alt-shift-1 = ['move-node-to-workspace 1' ,'workspace 1 '] 
@@ -171,19 +168,18 @@ on-mode-changed = []
     alt-shift-3 = ['move-node-to-workspace 3' ,'workspace 3 ']
     alt-shift-4 = ['move-node-to-workspace 4' ,'workspace 4 ']
     alt-shift-5 = ['move-node-to-workspace 5' ,'workspace 5 ']
-    alt-shift-6 = ['move-node-to-workspace 6' ,'workspace 6 ']
-    alt-shift-7 = ['move-node-to-workspace 7' ,'workspace 7 ']
-    alt-shift-8 = ['move-node-to-workspace 8' ,'workspace 8 ']
-    alt-shift-9 = ['move-node-to-workspace 9' ,'workspace 9 ']
-    alt-shift-0 = ['move-node-to-workspace 10' ,'workspace 10 ']
+
     alt-shift-c = ['move-node-to-workspace C','workspace C']
     alt-shift-t = ['move-node-to-workspace T','workspace T']
+    alt-shift-n = ['move-node-to-workspace N','workspace N']
     alt-shift-b = ['move-node-to-workspace B','workspace B']
     alt-shift-z = ['move-node-to-workspace Z','workspace Z']
     alt-shift-x = ['move-node-to-workspace X','workspace X']
   
+    # 窗口切换器（替代 AltTab）：列出所有工作区的窗口，选中后自动切到所在工作区
+    alt-tab = 'exec-and-forget bash $HOME/Documents/fantastic-i3/macos/window_switcher'
     # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
-    alt-tab = 'workspace-back-and-forth'
+    # alt-tab = 'workspace-back-and-forth'
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
     alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
     alt-r = 'mode resize'
@@ -225,9 +221,10 @@ on-mode-changed = []
     space = ['mode main']
 
 
+
 [[on-window-detected]]
     if.app-id = 'com.microsoft.Outlook'
-    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window'] 
+    run = ['layout floating', 'move-node-to-workspace B', 'exec-and-forget center-window']
 
 [[on-window-detected]]
     if.app-id = 'com.baidu.netdisk'
@@ -238,46 +235,37 @@ on-mode-changed = []
     run = ['layout floating']
 
 [[on-window-detected]]
-    if.app-id = 'com.google.Chrome'
-    run = ['layout floating', 'move-node-to-workspace 3']
+if.app-id = 'com.google.Chrome'
+run = ['layout floating', 'move-node-to-workspace Z']
 
 [[on-window-detected]]
     if.app-id = 'com.kangfenmao.CherryStudio'
     run = ['layout floating','exec-and-forget center-window']
 
 [[on-window-detected]]
-    if.app-id = 'com.tencent.xinWeChat'
-    if.window-title-regex-substring = '^(微信|WeChat)$'
-    run = ['layout floating', 'exec-and-forget center-window']
+if.app-id = 'com.tencent.xinWeChat'
+if.window-title-regex-substring = '^(微信|WeChat)$'
+run = ['layout floating', 'exec-and-forget center-window', 'move-node-to-workspace B']
+
+# [[on-window-detected]]
+# if.app-id = 'com.tencent.xinWeChat'
+# run = ['layout floating', 'move-node-to-workspace 10']
 
 [[on-window-detected]]
-    if.app-id = 'com.tencent.xinWeChat'
-    run = ['layout floating']
+if.app-id = 'com.microsoft.Powerpoint'
+run = ['layout floating', 'move-node-to-workspace 3']
 
 [[on-window-detected]]
-    if.app-id = 'org.zotero.zotero'
-    run = 'layout floating'
+if.app-id = 'com.microsoft.Word'
+run = ['layout floating', 'move-node-to-workspace 1']
 
 [[on-window-detected]]
-    if.app-id = 'org.zotero.zotero'
-    if.window-title-regex-substring = '^(zotero)$'
-    run = ['layout tiling']
+if.app-id = 'com.microsoft.Excel'
+run = ['layout floating', 'move-node-to-workspace 2']
 
 [[on-window-detected]]
-    if.app-id = 'com.microsoft.Powerpoint'
-    run = 'layout floating'
-
-[[on-window-detected]]
-    if.app-id = 'com.microsoft.Word'
-    run = 'layout floating'
-
-[[on-window-detected]]
-    if.app-id = 'com.microsoft.Excel'
-    run = 'layout floating'
-
-[[on-window-detected]]
-    if.app-id = 'com.tencent.meeting'
-    run = 'layout floating'
+if.app-id = 'com.tencent.meeting'
+run = ['layout floating', 'move-node-to-workspace Z']
 
 [[on-window-detected]]
     if.app-id = 'com.tencent.qq'
@@ -299,17 +287,13 @@ on-mode-changed = []
     if.app-id = 'net.kovidgoyal.kitty'
     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
-# [[on-window-detected]]
-#     if.app-id = 'com.googlecode.iterm2'
-#     run = ['layout tiling', 'move-node-to-workspace T', 'exec-and-forget center-window']
-
 [[on-window-detected]]
     if.app-id = 'com.googlecode.iterm2'
-    run = ['layout floating']
+    run = ['layout tiling', 'move-node-to-workspace T', 'exec-and-forget center-window']
 
-# [[on-window-detected]]
-#     if.app-id = 'com.googlecode.iterm2.iTermAI'
-#     run = ['layout floating', 'move-node-to-workspace T', 'exec-and-forget center-window']
+[[on-window-detected]]
+if.app-id = 'com.googlecode.iterm2'
+run = ['layout floating', 'move-node-to-workspace T']
 
 [[on-window-detected]]
     if.app-id = 'com.bilibili.bilibiliPC'
@@ -346,11 +330,15 @@ on-mode-changed = []
 
 [[on-window-detected]]
     if.window-title-regex-substring = '^(.*[T|t]rae.*)$'
-    run = ['layout tiling']
+    run = ['layout tiling', 'move-node-to-workspace C']
 
 [[on-window-detected]]
-    if.app-name-regex-substring = '^(小红书|X|知乎)$'
-    run = ['layout tiling']
+if.app-name-regex-substring = '^(小红书|X)$'
+run = ['layout tiling']
+
+[[on-window-detected]]
+if.app-name-regex-substring = '^知乎$'
+run = ['layout tiling', 'move-node-to-workspace Z']
 
 [[on-window-detected]]
     if.app-id = 'com.apple.iCal'
@@ -379,6 +367,108 @@ on-mode-changed = []
 [[on-window-detected]]
     if.window-title-regex-substring = '^(python*)'
     run = ['layout floating']
+
+# =====================================================
+# Workspace T — Terminal (in addition to kitty / iTerm above)
+# =====================================================
+[[on-window-detected]]
+if.app-id = 'com.apple.Terminal'
+run = ['layout floating', 'move-node-to-workspace T']
+
+# =====================================================
+# Workspace N — Other office (Zotero Apple Notes, Typora, ...)
+# =====================================================
+[[on-window-detected]]
+if.app-id = 'com.apple.Notes'
+run = ['layout floating', 'move-node-to-workspace N']
+
+[[on-window-detected]]
+if.app-name-regex-substring = '^(Typora)$'
+run = ['layout floating', 'move-node-to-workspace N']
+
+[[on-window-detected]]
+if.app-id = 'md.obsidian'
+run = ['layout floating', 'move-node-to-workspace N']
+
+[[on-window-detected]]
+if.app-id = 'notion.id'
+run = ['layout floating', 'move-node-to-workspace N']
+
+[[on-window-detected]]
+if.app-id = 'org.zotero.zotero'
+run = ['layout floating', 'move-node-to-workspace N']
+
+[[on-window-detected]]
+if.app-id = 'org.zotero.zotero'
+if.window-title-regex-substring = '^(zotero)$'
+run = ['layout tiling', 'move-node-to-workspace N']
+
+
+
+
+# =====================================================
+# Workspace B — Multimedia / Entertainment
+# (QQ Music, Bilibili already in B above. Add Douyin, Spotify.)
+# =====================================================
+[[on-window-detected]]
+if.app-name-regex-substring = '^(Douyin|抖音)$'
+run = ['layout floating', 'move-node-to-workspace B']
+
+[[on-window-detected]]
+if.app-id = 'com.spotify.client'
+run = ['layout floating', 'move-node-to-workspace B']
+
+[[on-window-detected]]
+if.app-id = 'com.apple.Music'
+run = ['layout floating', 'move-node-to-workspace B']
+
+# =====================================================
+# Workspace 1 — Browser default
+# (Chrome already in 1 above. Add Safari, Edge, Arc, Brave, Firefox.)
+# Place these BEFORE the title-based overrides below.
+# =====================================================
+[[on-window-detected]]
+if.app-id = 'com.apple.Safari'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+[[on-window-detected]]
+if.app-id = 'com.microsoft.edgemac'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+[[on-window-detected]]
+if.app-id = 'company.thebrowser.Browser'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+[[on-window-detected]]
+if.app-id = 'com.brave.Browser'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+[[on-window-detected]]
+if.app-id = 'org.mozilla.firefox'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+# =====================================================
+# Browser title overrides → workspace Z (learning sites)
+# These run AFTER the generic browser rules so they win.
+# =====================================================
+[[on-window-detected]]
+if.window-title-regex-substring = '(Hugging Face|ModelScope|魔搭)'
+run = ['layout floating', 'move-node-to-workspace Z']
+
+# =====================================================
+# Workspace X — Misc (System Settings, etc.)
+# =====================================================
+[[on-window-detected]]
+if.app-id = 'com.apple.SystemSettings'
+run = ['layout floating', 'move-node-to-workspace X']
+
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = ['layout floating', 'move-node-to-workspace X']
+
+[[on-window-detected]]
+if.app-id = 'com.apple.ActivityMonitor'
+run = ['layout floating', 'exec-and-forget center-window', 'move-node-to-workspace X']
 
 [workspace-to-monitor-force-assignment]
     # X = ["built-in"]
