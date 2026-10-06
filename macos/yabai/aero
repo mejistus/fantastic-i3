@@ -7,9 +7,10 @@
 #   aero fullscreen                                          = fullscreen（平铺、浮动窗口都能用）
 #   aero resize <smart|width|height> <+N|-N>                 = resize
 #   aero center [窗口 id]                                     替代 center-window 脚本
+#   aero float-fixed <窗口 id>                               不能调整大小的平铺窗口改成浮动并居中
 #   aero tile-floating                                       service 模式的 f：浮动窗口全部改回平铺并平均分配
 #   aero focus-window <窗口 id>                              聚焦窗口（在别的桌面就先切过去）
-#   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌥⇥ 窗口切换器用）
+#   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌘⇥ 窗口切换器用）
 #   aero helper <…>                                          运行 aero-helper（需要时自动编译）
 #   aero reload                                              = reload-config（不重启 yabai，不打乱窗口）
 #   aero keys <auto|sa|native> [--force]                     桌面快捷键模式（见下）
@@ -46,6 +47,14 @@ CONTROL=262144
 
 notify() {
     osascript -e "display notification \"$1\" with title \"yabai\"" >/dev/null 2>&1
+}
+
+# 排查用的日志：/tmp/yabai-aero-$USER/aero.log（重启后清空，超过 500 行只留后 300 行）
+log() {
+    local f="$STATE/aero.log"
+    echo "$(date '+%F %T') $*" >>"$f"
+    [ "$(wc -l <"$f")" -gt 500 ] && tail -300 "$f" >"$f.$$" && mv "$f.$$" "$f"
+    return 0
 }
 
 keys_mode() {
@@ -173,34 +182,43 @@ cmd_move_node_to_workspace() {
     # 同一时间只处理一次移动：上一次还没完成时（切桌面动画中）焦点不稳定，再按会移错窗口
     local lock="$STATE/move.lock"
     if ! mkdir "$lock" 2>/dev/null; then
-        [ $(($(date +%s) - $(stat -f %m "$lock" 2>/dev/null || echo 0))) -lt 5 ] && return 0
+        [ $(($(date +%s) - $(stat -f %m "$lock" 2>/dev/null || echo 0))) -lt 5 ] && { log "move $target: 上一次移动还没完成，忽略"; return 0; }
         rm -rf "$lock"
         mkdir "$lock" 2>/dev/null || return 0
     fi
     trap "rm -rf '$lock'" EXIT   # 定义时就展开成固定路径：退出时函数里的 local 变量已经没了
 
     local win id dst
-    win=$(yabai -m query --windows --window 2>/dev/null) || return 0
+    if ! win=$(yabai -m query --windows --window 2>/dev/null); then
+        # 以前这里静默退出，看起来就是"按了没反应"
+        local front
+        front=$(lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null | sed 's/.*="\(.*\)"/\1/')
+        log "move $target: yabai 找不到当前窗口（前台应用：${front:-?}）"
+        notify "yabai 找不到当前窗口（${front:-?}），没有移动"
+        return 0
+    fi
     id=$(jq -r .id <<<"$win")
     dst=$(space_index "$target")
     if [ -z "$dst" ]; then
+        log "move $target: 桌面不存在"
         notify "工作区 $target 对应的桌面不存在，请在调度中心里添加桌面"
         return 1
     fi
     if [ "$(jq -r .space <<<"$win")" = "$dst" ]; then
         return 0
     fi
+    log "move $target: 窗口 $id（$(jq -r .app <<<"$win")）从桌面 $(jq -r .space <<<"$win") 移到 $dst"
 
     if [ "$follow" = --focus-follows-window ] && [ "$(keys_mode)" != sa ]; then
         # 没有 SA：先切到目标桌面，再把窗口移过来、聚焦。
         # 反过来（先移再聚焦）不可靠：原桌面被移空时 macOS 会自己切到别的应用的桌面，和我们抢。
-        workspace_focus "$dst"
-        move_window "$id" "$dst" || { notify "没能把窗口移到工作区 $target"; return 1; }
+        workspace_focus "$dst" || log "move $target: 没切到桌面 $dst（⌥⇧ 按住超过 1 秒？），只移窗口"
+        move_window "$id" "$dst" || { log "move $target: 移动失败"; notify "没能把窗口移到工作区 $target"; return 1; }
         yabai -m window --focus "$id" 2>/dev/null
         return 0
     fi
 
-    move_window "$id" "$dst" || { notify "没能把窗口移到工作区 $target"; return 1; }
+    move_window "$id" "$dst" || { log "move $target: 移动失败"; notify "没能把窗口移到工作区 $target"; return 1; }
     if [ "$follow" = --focus-follows-window ]; then
         yabai -m space --focus "$dst" 2>/dev/null
         yabai -m window --focus "$id" 2>/dev/null
@@ -294,6 +312,15 @@ cmd_center() {
     yabai -m window "$id" --move "abs:$x:$y"
 }
 
+# 不能调整大小的平铺窗口改成浮动并居中（如微信的扫码登录窗口：平铺只会占掉一格，自己却撑不满）
+cmd_float_fixed() {
+    local id=${1:-}
+    [ -n "$id" ] || return 1
+    [ "$(yabai -m query --windows --window "$id" 2>/dev/null | jq -r '."can-resize" or ."is-floating"')" = false ] || return 0
+    yabai -m window "$id" --toggle float 2>/dev/null
+    cmd_center "$id"
+}
+
 # 聚焦一个窗口；在别的桌面上就先切过去再聚焦（直接聚焦跨桌面的窗口，macOS 有时不切桌面）
 cmd_focus_window() {
     local id=${1:-} sp
@@ -306,7 +333,7 @@ cmd_focus_window() {
     return 0
 }
 
-# 记录窗口的使用顺序（yabai 的 window_focused 信号调用），供 ⌥⇥ 窗口切换器排序
+# 记录窗口的使用顺序（yabai 的 window_focused 信号调用），供 ⌘⇥ 窗口切换器排序
 cmd_mru_push() {
     local id=${1:-} f="$STATE/mru"
     [ -n "$id" ] || return 0
@@ -327,9 +354,15 @@ cmd_tile_floating() {
 
 # ---------------------------------------------------------------- config
 
+# skhd --reload 靠 /tmp 里的 pid 文件找到 skhd；macOS 会清理 /tmp 里放了几天的文件，
+# pid 文件没了 --reload 就失败（退出码 1），这时重启 skhd 服务
+skhd_reload() {
+    skhd --reload 2>/dev/null || skhd --restart-service >/dev/null 2>&1
+}
+
 cmd_reload() {
     AERO_RELOAD=1 "$HOME/.config/yabai/yabairc" >/dev/null 2>&1
-    skhd --reload 2>/dev/null
+    skhd_reload
     return 0
 }
 
@@ -362,7 +395,7 @@ cmd_keys() { # <auto|sa|native> [--force]（改了 WORKSPACES / 按键后用 --f
 
     mkdir -p "$(dirname "$KEYS_LINK")"
     ln -sfn "$MACOS/skhd/workspaces-$want.skhdrc" "$KEYS_LINK"
-    skhd --reload 2>/dev/null
+    skhd_reload
     return 0
 }
 
@@ -412,6 +445,7 @@ case ${1:-} in
     fullscreen) cmd_fullscreen ;;
     resize) shift; cmd_resize "$@" ;;
     center) shift; cmd_center "$@" ;;
+    float-fixed) shift; cmd_float_fixed "$@" ;;
     tile-floating) cmd_tile_floating ;;
     focus-window) shift; cmd_focus_window "$@" ;;
     helper) shift; helper "$@" ;;
@@ -420,5 +454,5 @@ case ${1:-} in
     keys) shift; cmd_keys "$@" ;;
     spaces) cmd_spaces ;;
     status) cmd_status ;;
-    *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

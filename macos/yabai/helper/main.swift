@@ -10,13 +10,14 @@
 //       效果持续到重新登录，所以 yabai 每次启动都执行一次 off。
 //   aero-helper switcher [--select 窗口id] [--font-size N] [--width 屏幕宽度%] [--rows N]
 //       窗口切换列表。从 stdin 读 TSV：窗口id \t 桌面 \t 应用 \t 标题 \t 状态 \t pid
-//       打字模糊搜索，↑↓ / ⇥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），
-//       Esc 或再按一次 ⌥⇥ 关闭（退出码 1）。
+//       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法。
+//       ↑↓ / ⇥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
 //       ⌘+ / ⌘- 调整字号，⌘0 恢复默认；字号会记住。
 //
 // 编译：aero 第一次用到时自动编译到 ~/.cache/fantastic-i3/aero-helper
 
 import AppKit
+import Carbon
 import CoreGraphics
 
 // MARK: - 修饰键
@@ -71,6 +72,14 @@ func CGSSetSymbolicHotKeyEnabled(_ hotKey: Int32, _ isEnabled: Bool) -> CGError
 
 func setNativeCommandTab(_ enabled: Bool) {
     for hotKey: Int32 in [1, 2] { _ = CGSSetSymbolicHotKeyEnabled(hotKey, enabled) }
+}
+
+// MARK: - 输入法
+
+/// 切到系统的英文键盘布局：启用了哪个就用哪个（U.S.、ABC……），由系统决定
+func selectEnglishInput() {
+    guard let english = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue() else { return }
+    TISSelectInputSource(english)
 }
 
 // MARK: - 窗口切换列表
@@ -219,10 +228,9 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            // 列表开着时：再按一次 ⌥⇥ 关闭列表；⌘⇥ / ⌘⇧⇥（以及 ⌥⇧⇥）往下 / 往上选
+            // ⌘⇥ / ⌘⇧⇥ 往下 / 往上选（⌥⇥ 也一样，免得在搜索框里打出制表符）
             if event.keyCode == 48 {
                 let shift = event.modifierFlags.contains(.shift)
-                if event.modifierFlags.contains(.option) && !shift { exit(1) }
                 if !event.modifierFlags.intersection([.command, .option]).isEmpty {
                     self.select(self.table.selectedRow + (shift ? -1 : 1))
                     return nil
@@ -242,6 +250,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
         applyFont()
         filter("")
+        selectEnglishInput()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(search)

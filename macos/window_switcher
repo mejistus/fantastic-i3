@@ -1,14 +1,14 @@
 #!/bin/bash
 # 窗口切换器（yabai 版）
-#   window_switcher --list   立刻弹出所有桌面的窗口列表（⌥⇥）
+#   window_switcher --list   立刻弹出所有桌面的窗口列表
 #   window_switcher --back   直接切到上一个用过的窗口（back-and-forth）
 #   window_switcher [--auto] 快速按一下 = --back，按住 ⌘ 超过 HOLD_SECONDS = --list（⌘⇥）
 #
-# 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中。打字模糊搜索（输入桌面编号也行），
-#       ↑↓ 或 ⌘⇥ / ⌘⇧⇥ 选择，回车或单击切换，Esc 或再按一次 ⌥⇥ 关闭，
+# 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中。弹出时切到系统的英文输入法，
+#       打字模糊搜索（输入桌面编号也行），↑↓ 或 ⌘⇥ / ⌘⇧⇥ 选择，回车或单击切换，Esc 关闭，
 #       ⌘+ / ⌘- 调字号（会记住），⌘0 恢复默认
 # 窗口使用顺序由 yabai 的 window_focused 信号记录（aero mru-push）；列表界面是 aero-helper switcher。
-# 绑定：skhdrc 中的 alt - tab 和 cmd - tab
+# 绑定：skhdrc 中的 cmd - tab
 
 HOLD_SECONDS=0.25
 FONT_SIZE=28      # 默认字号（用 ⌘+ / ⌘- 调过之后以调过的为准）

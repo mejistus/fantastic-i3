@@ -8,10 +8,43 @@
 #   1. 检查 SIP 是否已按 yabai 要求部分关闭（这一步只能在恢复模式里做，脚本不会改）
 #   2. Apple Silicon：设置启动参数 -arm64e_preview_abi（改了需要重启）
 #   3. 写入 /private/etc/sudoers.d/yabai，允许免密码执行 `sudo yabai --load-sa`
+#   4. 修正 SA loader 的 arm64e ABI，让它能注入 macOS 15 的 Dock（见 patch_loader_abi）
 set -euo pipefail
 
 YABAI=/opt/homebrew/bin/yabai
 AERO="$(cd "$(dirname "$0")" && pwd)/aero"
+LOADER=/Library/ScriptingAdditions/yabai.osax/Contents/MacOS/loader
+DOCK=/System/Library/CoreServices/Dock.app/Contents/MacOS/Dock
+
+arm64e_slice() { # <文件> → "<胖文件里的序号> <caps> <切片偏移>"
+    otool -f "$1" | awk '/^architecture/{i=$2} /cputype/{t=$2} /cpusubtype/{s=$2} /capabilities/{c=$2}
+        /^ *offset/{if (t == 16777228 && s == 2) print i, c, $2}'
+}
+
+# yabai 7.1.16 起 SA 的 loader 按新的 arm64e 指针认证 ABI 编译（v1，caps 0x81），
+# macOS 15 的 Dock 还是 v0（caps 0x80），内核拒绝注入：
+#   could not spawn remote thread: (os/kern) protection failure
+# 两种 ABI 的指令没有区别，把 loader 头里的 caps 改成 0x80 再重新签名即可。
+# https://github.com/asmvik/yabai/issues/2686#issuecomment-3678216885
+# yabai 只按版本号判断 SA 是否要重装，所以改过的 loader 会一直保留到下次升级（升级后再运行本脚本）。
+patch_loader_abi() { # <loader>
+    local loader=$1 i caps off pos
+    read -r i caps off < <(arm64e_slice "$loader") || return 0
+    [ "$caps" = 0x81 ] && [ "$(arm64e_slice "$DOCK" | cut -d' ' -f2)" = 0x80 ] || return 0
+    # caps 是 cpusubtype 的最高字节：胖文件头是大端（第 i 个 fat_arch 从 8+i*20 开始，cpusubtype 在 +4），
+    # 切片自己的 Mach-O 头是小端（cpusubtype 在 +8，最高字节在 +11）
+    for pos in $((8 + i * 20 + 4)) $((off + 11)); do
+        if [ "$(xxd -s "$pos" -l 1 -p "$loader")" != 81 ]; then
+            echo "SA loader 的格式和预想的不一样，没有修改"
+            return 1
+        fi
+    done
+    for pos in $((8 + i * 20 + 4)) $((off + 11)); do
+        printf '\x80' | sudo dd of="$loader" bs=1 seek="$pos" count=1 conv=notrunc 2>/dev/null
+    done
+    sudo codesign -f -s - "$loader" 2>/dev/null
+    echo "✓ 已把 SA loader 改成 Dock 用的 arm64e ABI v0"
+}
 
 sip=$(csrutil status)
 if ! grep -q 'Filesystem Protections: disabled' <<<"$sip" || ! grep -q 'Debugging Restrictions: disabled' <<<"$sip"; then
@@ -41,6 +74,10 @@ sudo visudo -cf "$tmp" >/dev/null
 sudo install -m 0440 -o root -g wheel "$tmp" /private/etc/sudoers.d/yabai
 rm -f "$tmp"
 echo "✓ 已写入 /private/etc/sudoers.d/yabai"
+
+# SA 没装或版本不对时，--load-sa 只安装、不注入；先装好再改 loader
+sudo "$YABAI" --load-sa >/dev/null 2>&1 || true
+patch_loader_abi "$LOADER"
 
 if [ "$need_reboot" = 1 ]; then
     echo
