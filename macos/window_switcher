@@ -40,11 +40,22 @@ case $mode in
     *) echo "用法：window_switcher [--auto | --list | --back]" >&2; exit 2 ;;
 esac
 
-# 窗口按最近使用排序：上一个用过的在最前，当前窗口在最后
-cur=$(yabai -m query --windows --window 2>/dev/null | jq -r '.id // empty')
-recent=$(yabai -m query --windows --window recent 2>/dev/null | jq -r '.id // empty')
 mru=$(jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' "$STATE/mru" 2>/dev/null || echo '[]')
-rows=$(yabai -m query --windows | jq -r \
+windows=$(yabai -m query --windows)
+
+# 当前窗口。焦点在面板、对话框这类不在列表里的窗口上时（比如 Gemini 激活时焦点会落到一个小窗口上），
+# 把同一应用最近用过的普通窗口当作当前窗口；否则快速按 ⌘⇥ 只会切到这个应用自己的主窗口，看起来像没反应
+focused=$(yabai -m query --windows --window 2>/dev/null)
+cur=$(jq -r --argjson w "$windows" --argjson mru "$mru" '
+    . as $f
+    | if .role == "AXWindow" and .subrole == "AXStandardWindow" then .id
+      else [$w[] | select(.pid == $f.pid and .role == "AXWindow" and .subrole == "AXStandardWindow")]
+           | min_by(.id as $i | $mru | index($i) // 1e6) | .id end
+    | values' <<<"$focused" 2>/dev/null)
+recent=$(yabai -m query --windows --window recent 2>/dev/null | jq -r '.id // empty')
+
+# 窗口按最近使用排序：上一个用过的在最前，当前窗口在最后
+rows=$(jq -r <<<"$windows" \
     --argjson sp "$(yabai -m query --spaces)" --argjson mru "$mru" \
     --arg cur "$cur" --arg recent "$recent" '
     ($sp | map({key: (.index | tostring), value: (if .label != "" then .label else (.index | tostring) end)}) | from_entries) as $lab
@@ -63,6 +74,7 @@ rows=$(yabai -m query --windows | jq -r \
 prev=$(head -n1 <<<"$rows" | cut -f1)
 
 if [ "$mode" = --back ]; then
+    "$AERO" log "⌘⇥ 快按：焦点 $(jq -r '"\(.id) \(.app) \(.subrole)"' <<<"$focused" 2>/dev/null)，当前 ${cur:-?}，切到 ${prev:-无} $(head -n1 <<<"$rows" | cut -f3)"
     [ -n "$prev" ] && [ "$prev" != "$cur" ] && "$AERO" focus-window "$prev"
     exit 0
 fi

@@ -16,6 +16,7 @@
 #   aero keys <auto|sa|native> [--force]                     桌面快捷键模式（见下）
 #   aero spaces                                              创建 / 标记工作区对应的桌面
 #   aero status                                              查看当前状态
+#   aero log <消息>                                          写一行到 /tmp/yabai-aero-$USER/aero.log（排查用）
 #
 # 工作区 = macOS 桌面，编号 1-10 就是调度中心里的第 1-10 个桌面（⌥1…⌥9 ⌥0）。
 # 以后要加带名字的工作区，把名字加进 WORKSPACES，并在 KEY_ASCII / KEY_CODE / KEY_NAME 里补上按键：
@@ -322,14 +323,39 @@ cmd_float_fixed() {
 }
 
 # 聚焦一个窗口；在别的桌面上就先切过去再聚焦（直接聚焦跨桌面的窗口，macOS 有时不切桌面）
+# 前台应用的 pid（yabai 的"焦点窗口"有时跟不上：Finder 已经在前台了，它还报着原来的窗口）
+front_pid() {
+    lsappinfo info -only pid "$(lsappinfo front)" 2>/dev/null | tr -cd '0-9'
+}
+
 cmd_focus_window() {
-    local id=${1:-} sp
+    local id=${1:-} sp pid
     [ -n "$id" ] || return 1
+    echo "$id" >"$STATE/focus-target"   # 最新的聚焦请求；下面后台盯焦点的进程看到它变了就退出
     yabai -m window "$id" --deminimize 2>/dev/null
-    sp=$(yabai -m query --windows --window "$id" 2>/dev/null | jq -r '.space // empty')
-    [ -n "$sp" ] || return 1
-    [ "$sp" != "$(current_space)" ] && workspace_focus "$sp"
+    read -r sp pid < <(yabai -m query --windows --window "$id" 2>/dev/null | jq -r '"\(.space) \(.pid)"')
+    [ -n "$sp" ] && [ "$sp" != null ] || return 1
+    if [ "$sp" = "$(current_space)" ]; then
+        yabai -m window --focus "$id" 2>/dev/null
+        return 0
+    fi
+    workspace_focus "$sp"
     yabai -m window --focus "$id" 2>/dev/null
+    # 切桌面后，如果原来的应用在那个桌面上没有窗口，macOS 会自己再激活一个应用（那个桌面上次用的，
+    # 没有就是 Finder，也就是桌面本身），比切换晚 0.1-0.3 秒，把刚才的聚焦抢走：窗口在最前面，
+    # 却是未激活的样子，按键也进不去（比如 Gemini 和关了窗口的微信在同一个桌面时）。
+    # 所以在后台盯 0.6 秒左右，被抢走就重新聚焦；有了新的聚焦请求、或者已经离开这个桌面就不管了。
+    # （不能先聚焦再切桌面：那样桌面不切，窗口看不见却拿着焦点；
+    #  也不能先干等 macOS 那一下：它不一定会发生，干等最多要 1 秒。）
+    (
+        for _ in 1 2 3 4 5 6; do
+            sleep 0.05
+            [ "$(cat "$STATE/focus-target" 2>/dev/null)" = "$id" ] || exit 0
+            [ "$(current_space)" = "$sp" ] || exit 0
+            [ "$(front_pid)" = "$pid" ] && [ "$(yabai -m query --windows --window 2>/dev/null | jq -r .id)" = "$id" ] ||
+                yabai -m window --focus "$id" 2>/dev/null
+        done
+    ) >/dev/null 2>&1 &
     return 0
 }
 
@@ -450,9 +476,10 @@ case ${1:-} in
     focus-window) shift; cmd_focus_window "$@" ;;
     helper) shift; helper "$@" ;;
     mru-push) shift; cmd_mru_push "$@" ;;
+    log) shift; log "$*" ;;
     reload) cmd_reload ;;
     keys) shift; cmd_keys "$@" ;;
     spaces) cmd_spaces ;;
     status) cmd_status ;;
-    *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
