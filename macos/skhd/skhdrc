@@ -25,6 +25,12 @@ alt + shift - h : yabai -m window --swap west
 alt + shift - j : yabai -m window --swap south
 alt + shift - k : yabai -m window --swap north
 alt + shift - l : yabai -m window --swap east
+# 方向键版：⌘⇧ + 方向键（PC 键盘上是 Win+Shift+方向键）。
+# 代价：所有应用里"选到行首 / 行尾 / 文首 / 文末"（⌘⇧←→↑↓）都被占掉
+cmd + shift - left  : yabai -m window --swap west
+cmd + shift - down  : yabai -m window --swap south
+cmd + shift - up    : yabai -m window --swap north
+cmd + shift - right : yabai -m window --swap east
 
 # fullscreen / layout floating tiling
 alt - f         : $HOME/Documents/fantastic-i3/macos/yabai/aero fullscreen
