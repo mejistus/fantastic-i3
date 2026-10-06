@@ -4,7 +4,8 @@
 #   window_switcher --back   直接切到上一个用过的窗口（back-and-forth）
 #   window_switcher [--auto] 快速按一下 = --back，按住 ⌘ 超过 HOLD_SECONDS = --list（⌘⇥）
 #
-# 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中。弹出时切到系统的英文输入法，
+# 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中；末尾是 Dock 里亮着点、但没有窗口的应用，
+#       选中它就像点 Dock 图标（一般会新开一个窗口）。弹出时切到系统的英文输入法，
 #       打字模糊搜索（输入桌面编号也行），↑↓ 或 ⌘⇥ / ⌘⇧⇥ 选择，回车或单击切换，Esc 关闭，
 #       ⌘+ / ⌘- 调字号（会记住），⌘0 恢复默认
 # 窗口使用顺序由 yabai 的 window_focused 信号记录（aero mru-push）；列表界面是 aero-helper switcher。
@@ -59,15 +60,27 @@ rows=$(yabai -m query --windows | jq -r \
        (if (.id | tostring) == $cur then "当前" elif ."is-minimized" then "最小化" elif ."is-hidden" then "已隐藏" else "" end),
        (.pid | tostring)]
     | @tsv')
-[ -n "$rows" ] || exit 0
 prev=$(head -n1 <<<"$rows" | cut -f1)
 
 if [ "$mode" = --back ]; then
-    [ "$prev" != "$cur" ] && "$AERO" focus-window "$prev"
+    [ -n "$prev" ] && [ "$prev" != "$cur" ] && "$AERO" focus-window "$prev"
     exit 0
 fi
 
 # 列表按桌面编号排序；同一桌面内保持最近使用的顺序（稳定排序）；默认选中上一个用过的窗口
 id=$(sort -s -t $'\t' -k2,2n <<<"$rows" |
-    "$AERO" helper switcher --select "$prev" --font-size "$FONT_SIZE" --width "$WIDTH" --rows "$ROWS") || exit 0
-[ -n "$id" ] && "$AERO" focus-window "$id"
+    "$AERO" helper switcher --apps --select "$prev" --font-size "$FONT_SIZE" --width "$WIDTH" --rows "$ROWS") || exit 0
+case $id in
+    app:*)
+        # 没有窗口的应用（app:pid:bundle id）：像点 Dock 图标一样打开。新窗口可能被规则放到别的工作区，出现后跟过去
+        pid=${id#app:}
+        open -b "${pid#*:}"
+        pid=${pid%%:*}
+        for _ in $(seq 20); do
+            win=$(yabai -m query --windows | jq -r --argjson pid "$pid" \
+                'map(select(.pid == $pid and .subrole == "AXStandardWindow"))[0].id // empty')
+            if [ -n "$win" ]; then "$AERO" focus-window "$win"; break; fi
+            sleep 0.1
+        done ;;
+    ?*) "$AERO" focus-window "$id" ;;
+esac
