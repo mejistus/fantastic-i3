@@ -70,7 +70,7 @@ The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somew
 | ⌥H/J/K/L, ⌥⇧H/J/K/L | Focus / swap left, down, up, right |
 | ⌥F / ⌥⇧F | Fullscreen / toggle floating |
 | ⌥- / ⌥= | Shrink / grow the window |
-| ⌘⇥ | Tap: previous window. Hold ⌘: window list, which switches to the English keyboard layout so you can type to search |
+| ⌘⇥ | Tap: previous window. Hold ⌘: window list, which switches to the English keyboard layout so you can type to search. Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
 | ⌥R / ⌃S | Resize mode / service mode |
 | ⌥D | Bring a Finder window to this workspace, or open one |
 | ⌥G | Jump to Safari, or open a window |

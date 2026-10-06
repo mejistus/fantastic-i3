@@ -8,8 +8,9 @@
 //   aero-helper native-cmd-tab on|off
 //       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器（关掉后 ⌘⇥ 才能交给 skhd）。
 //       效果持续到重新登录，所以 yabai 每次启动都执行一次 off。
-//   aero-helper switcher [--select 窗口id] [--font-size N] [--width 屏幕宽度%] [--rows N]
+//   aero-helper switcher [--select 窗口id] [--apps] [--font-size N] [--width 屏幕宽度%] [--rows N]
 //       窗口切换列表。从 stdin 读 TSV：窗口id \t 桌面 \t 应用 \t 标题 \t 状态 \t pid
+//       --apps：列表末尾再加上 Dock 里亮着点、但没有窗口的应用（选中时输出 app:pid:bundle id）。
 //       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法。
 //       ↑↓ / ⇥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
 //       ⌘+ / ⌘- 调整字号，⌘0 恢复默认；字号会记住。
@@ -84,6 +85,20 @@ func selectEnglishInput() {
 
 // MARK: - 窗口切换列表
 
+/// Dock 里亮着点（普通应用）、但不在 pids 里的应用：窗口都关了，或者 yabai 看不到它的窗口。按名字排序。
+func windowlessApps(excluding pids: Set<pid_t>) -> [Item] {
+    NSWorkspace.shared.runningApplications
+        .filter { $0.activationPolicy == .regular && !$0.isTerminated && !pids.contains($0.processIdentifier) }
+        .compactMap { app -> Item? in
+            guard let bundle = app.bundleIdentifier, let url = app.bundleURL else { return nil }
+            let file = url.deletingPathExtension().lastPathComponent
+            let name = app.localizedName ?? file
+            return Item(id: "app:\(app.processIdentifier):\(bundle)", desk: "", app: name, title: "", state: "无窗口",
+                        pid: app.processIdentifier, haystack: Array("\(name) \(file)".lowercased()))
+        }
+        .sorted { $0.app.localizedStandardCompare($1.app) == .orderedAscending }
+}
+
 struct Item {
     let id: String
     let desk: String
@@ -130,6 +145,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
     var fontSize: CGFloat
     var widthPercent: CGFloat = 55
     var maxRows = 12
+    var includeApps = false
 
     let panel = KeyPanel(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
     let search = NSTextField()
@@ -146,6 +162,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
             let value = i + 1 < arguments.count ? arguments[i + 1] : ""
             switch arguments[i] {
             case "--select": preselect = value; i += 1
+            case "--apps": includeApps = true
             case "--font-size": initialFont = CGFloat(Double(value) ?? Double(initialFont)); i += 1
             case "--width": widthPercent = CGFloat(Double(value) ?? 55); i += 1
             case "--rows": maxRows = Int(value) ?? 12; i += 1
@@ -165,6 +182,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
                             pid: pid_t(field(5)) ?? 0,
                             haystack: Array("\(field(1)) \(field(2)) \(field(3))".lowercased())))
         }
+        if includeApps { all += windowlessApps(excluding: Set(all.map(\.pid))) }
         shown = all
     }
 
