@@ -8,9 +8,11 @@
 #   aero resize <smart|width|height> <+N|-N>                 = resize
 #   aero center [窗口 id]                                     替代 center-window 脚本
 #   aero float-fixed <窗口 id>                               不能调整大小的平铺窗口改成浮动并居中
-#   aero tile-floating                                       service 模式的 f：浮动窗口全部改回平铺并平均分配
+#   aero toggle-float                                        ⌥⇧F：当前窗口在平铺 / 浮动之间切换
+#   aero toggle-space-float                                  service 模式的 f：当前工作区的窗口全部平铺 / 全部浮动
+#   aero ensure-focus                                        切桌面后焦点不在这个桌面的窗口上时补一下（space_changed 信号调）
 #   aero focus-window <窗口 id>                              聚焦窗口（在别的桌面就先切过去）
-#   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌘⇥ 窗口切换器用）
+#   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌥⇥ 窗口切换器用）
 #   aero helper <…>                                          运行 aero-helper（需要时自动编译）
 #   aero reload                                              = reload-config（不重启 yabai，不打乱窗口）
 #   aero keys <auto|sa|native> [--force]                     桌面快捷键模式（见下）
@@ -74,18 +76,17 @@ current_space() {
     yabai -m query --spaces --space | jq -r .index
 }
 
-# 小工具 aero-helper（Swift，源码 helper/main.swift）：模拟按键、等修饰键松开、窗口切换列表。
+# 小工具 aero-helper（Swift，源码 helper/*.swift）：模拟按键、等修饰键松开、窗口切换列表、SketchyBar 数据。
 # 第一次用到或源码改过时自动编译（约 15 秒）。
-HELPER_SRC="$HERE/helper/main.swift"
 HELPER="$HOME/.cache/fantastic-i3/aero-helper"
 helper() {
-    if [ ! -x "$HELPER" ] || [ "$HELPER_SRC" -nt "$HELPER" ]; then
+    if [ ! -x "$HELPER" ] || [ -n "$(find "$HERE/helper" -name '*.swift' -newer "$HELPER" 2>/dev/null)" ]; then
         mkdir -p "$(dirname "$HELPER")"
-        if swiftc -O -swift-version 5 -o "$HELPER.$$" "$HELPER_SRC" 2>/dev/null; then
+        if swiftc -O -swift-version 5 -o "$HELPER.$$" "$HERE"/helper/*.swift 2>/dev/null; then
             mv -f "$HELPER.$$" "$HELPER"
         else
             rm -f "$HELPER.$$"
-            notify "aero-helper 编译失败：swiftc -O -o $HELPER $HELPER_SRC"
+            notify "aero-helper 编译失败：swiftc -O -o $HELPER $HERE/helper/*.swift"
             return 1
         fi
     fi
@@ -359,22 +360,81 @@ cmd_focus_window() {
     return 0
 }
 
-# 记录窗口的使用顺序（yabai 的 window_focused 信号调用），供 ⌘⇥ 窗口切换器排序
+# 记录窗口的使用顺序（yabai 的 window_focused 信号调用），供 ⌥⇥ 窗口切换器排序
 cmd_mru_push() {
     local id=${1:-} f="$STATE/mru"
     [ -n "$id" ] || return 0
     { echo "$id"; grep -vx "$id" "$f" 2>/dev/null; } | head -200 >"$f.$$" && mv "$f.$$" "$f"
 }
 
-cmd_tile_floating() {
+# 某个桌面上的普通窗口（没最小化、没隐藏），按最近使用排序；给了 pid 的话这个应用的窗口排在前面
+space_windows_mru() { # <桌面> [pid]
+    local mru
+    mru=$(jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' "$STATE/mru" 2>/dev/null || echo '[]')
+    yabai -m query --windows --space "$1" 2>/dev/null | jq -r --argjson mru "$mru" --arg pid "${2:-}" '
+        [.[] | select(.subrole == "AXStandardWindow" and (."is-minimized" | not) and (."is-hidden" | not))]
+        | sort_by([(if (.pid | tostring) == $pid then 0 else 1 end), (.id as $i | $mru | index($i) // 1e6)])
+        | .[].id'
+}
+
+# 当前窗口的 id。yabai 记的焦点窗口在当前桌面上、又属于前台应用，就用它；
+# 不然（切桌面后 macOS 把焦点给了 Finder，也就是桌面本身）用前台应用在当前桌面上的窗口，
+# 再不然用当前桌面上最近用过的窗口
+focused_window() {
+    local sp win pid
+    sp=$(current_space)
+    pid=$(front_pid)
+    win=$(yabai -m query --windows --window 2>/dev/null | jq -r --argjson sp "$sp" 'select(.space == $sp) | "\(.id) \(.pid)"')
+    if [ -n "$win" ] && [ "${win#* }" = "$pid" ]; then
+        echo "${win% *}"
+    else
+        space_windows_mru "$sp" "$pid" | head -1
+    fi
+}
+
+cmd_toggle_float() {
     local id
-    for id in $(yabai -m query --windows --space | jq -r '.[]
-            | select(."is-floating" and .subrole == "AXStandardWindow")
-            | select((."is-minimized" or ."is-hidden" or ."is-sticky") | not)
-            | .id'); do
-        yabai -m window "$id" --toggle float 2>/dev/null
+    id=$(focused_window)
+    if [ -z "$id" ]; then
+        log "toggle-float：当前桌面上没有窗口"
+        return 1
+    fi
+    yabai -m window "$id" --toggle float
+}
+
+# 当前工作区的窗口：有浮动的，就全部改回平铺并平均分配；都已经平铺了，就全部改成浮动
+cmd_toggle_space_float() {
+    local windows id
+    windows=$(yabai -m query --windows --space | jq -c '[.[] | select(.subrole == "AXStandardWindow")
+        | select((."is-minimized" or ."is-hidden" or ."is-sticky") | not)]')
+    if [ "$(jq '[.[] | select(."is-floating")] | length' <<<"$windows")" -gt 0 ]; then
+        for id in $(jq -r '.[] | select(."is-floating") | .id' <<<"$windows"); do
+            yabai -m window "$id" --toggle float 2>/dev/null
+        done
+        yabai -m space --balance 2>/dev/null
+    else
+        for id in $(jq -r '.[].id' <<<"$windows"); do
+            yabai -m window "$id" --toggle float 2>/dev/null
+        done
+    fi
+    return 0
+}
+
+# 切桌面之后（⌥N、⌃H/⌃L、触控板、调度中心……）macOS 常常再激活一下别的应用（这个桌面上次用的，
+# 没有就是 Finder，也就是桌面本身），焦点就不在这个桌面的窗口上：窗口看得见，⌥⇧F、换位置之类却找不到它。
+# yabai 的 space_changed 信号调这里：0.6 秒内焦点不在这个桌面的窗口上，就聚焦这个桌面上最近用过的窗口。
+cmd_ensure_focus() {
+    local sp pid target _
+    sp=$(current_space)
+    for _ in 1 2 3 4 5 6; do
+        sleep 0.1
+        [ "$(current_space)" = "$sp" ] || return 0   # 又切走了
+        pid=$(yabai -m query --windows --window 2>/dev/null | jq -r --argjson sp "$sp" 'select(.space == $sp) | .pid')
+        [ -n "$pid" ] && [ "$pid" = "$(front_pid)" ] && continue
+        target=$(space_windows_mru "$sp" | head -1)
+        [ -n "$target" ] || return 0                 # 空桌面
+        yabai -m window --focus "$target" 2>/dev/null
     done
-    yabai -m space --balance 2>/dev/null
     return 0
 }
 
@@ -472,7 +532,9 @@ case ${1:-} in
     resize) shift; cmd_resize "$@" ;;
     center) shift; cmd_center "$@" ;;
     float-fixed) shift; cmd_float_fixed "$@" ;;
-    tile-floating) cmd_tile_floating ;;
+    toggle-float) cmd_toggle_float ;;
+    toggle-space-float) cmd_toggle_space_float ;;
+    ensure-focus) cmd_ensure_focus ;;
     focus-window) shift; cmd_focus_window "$@" ;;
     helper) shift; helper "$@" ;;
     mru-push) shift; cmd_mru_push "$@" ;;
@@ -481,5 +543,5 @@ case ${1:-} in
     keys) shift; cmd_keys "$@" ;;
     spaces) cmd_spaces ;;
     status) cmd_status ;;
-    *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

@@ -4,12 +4,13 @@
 #
 # 做的事：
 #   1. 检查 Apple Silicon、Xcode 命令行工具（swiftc 编译 aero-helper，otool 给 setup-sa 用）、Homebrew
-#   2. 用 brew 安装 yabai、skhd、jq
+#   2. 用 brew 安装 yabai、skhd、jq、SketchyBar，以及字体 Maple Mono NF、sketchybar-app-font
 #   3. 仓库要在 ~/Documents/fantastic-i3（skhdrc 里写的是这个路径）：克隆在别处就在那里建一个链接
-#   4. 链接配置：~/.config/yabai/yabairc、~/.config/skhd/skhdrc（原来的文件会备份）
-#   5. 关掉调度中心的"根据最近的使用情况自动重新排列空间"（否则桌面顺序会变，工作区编号就乱了）
+#   4. 链接配置：~/.config/yabai/yabairc、~/.config/skhd/skhdrc、~/.config/sketchybar（原来的会备份）
+#   5. 关掉调度中心的"根据最近的使用情况自动重新排列空间"（否则桌面顺序会变，工作区编号就乱了）；
+#      菜单栏设为自动隐藏（顶上换成 SketchyBar）
 #   6. 编译 aero-helper（窗口切换列表等）
-#   7. 启动 yabai、skhd 服务，检查辅助功能权限
+#   7. 启动 yabai、skhd、SketchyBar 服务，检查辅助功能权限
 #   8. 检查桌面够不够 10 个
 #
 # 要自己动手的：给 yabai、skhd 辅助功能权限（脚本会打开设置页面）；在调度中心里把桌面加到 10 个。
@@ -36,10 +37,13 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 ok "Apple Silicon、Xcode 命令行工具、Homebrew"
 
 # ---- 2. 软件 ----
-for f in asmvik/formulae/yabai asmvik/formulae/skhd jq; do
+for f in asmvik/formulae/yabai asmvik/formulae/skhd FelixKratz/formulae/sketchybar jq; do
     brew list --formula "${f##*/}" >/dev/null 2>&1 || brew install "$f"
 done
-ok "yabai $(yabai --version | sed 's/yabai-v//')、skhd、jq"
+for f in font-maple-mono-nf font-sketchybar-app-font; do   # sketchybar-app-font 要和 sketchybar/icon_map.sh 同一版本
+    brew list --cask "$f" >/dev/null 2>&1 || brew install --cask "$f"
+done
+ok "yabai $(yabai --version | sed 's/yabai-v//')、skhd、$(sketchybar --version | sed 's/-v/ /')、jq、字体"
 
 # ---- 3. 仓库位置 ----
 if [ "$(cd "$HOME_REPO" 2>/dev/null && pwd -P)" != "$REPO" ]; then
@@ -66,6 +70,7 @@ link() { # <仓库里的文件> <链接位置>
 }
 link "$HOME_REPO/macos/yabai/yabairc" "$HOME/.config/yabai/yabairc"
 link "$HOME_REPO/macos/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
+link "$HOME_REPO/macos/sketchybar" "$HOME/.config/sketchybar"
 # skhdrc 末尾 .load 这个文件；之后由 aero keys 按 SA 是否加载切换成 sa / native，这里只在没有时先放一个
 [ -e "$HOME/.config/skhd/workspaces.skhdrc" ] ||
     ln -sfn "$HOME_REPO/macos/skhd/workspaces-native.skhdrc" "$HOME/.config/skhd/workspaces.skhdrc"
@@ -76,6 +81,11 @@ if [ "$(defaults read com.apple.dock mru-spaces 2>/dev/null)" != 0 ]; then
     killall Dock
 fi
 ok "调度中心：不按最近使用情况重新排列空间"
+if [ "$(osascript -e 'tell application "System Events" to get autohide menu bar of dock preferences' 2>/dev/null)" != true ]; then
+    osascript -e 'tell application "System Events" to set autohide menu bar of dock preferences to true' >/dev/null 2>&1 ||
+        todo+=("系统设置 → 控制中心 → 自动隐藏和显示菜单栏：选\"始终\"（顶上换成了 SketchyBar）")
+fi
+ok "菜单栏：自动隐藏"
 if [ "$(defaults read com.apple.spaces spans-displays 2>/dev/null)" = 1 ]; then
     todo+=("系统设置 → 桌面与程序坞 → 打开\"显示器具有单独的空间\"，然后注销重新登录（yabai 需要）")
 fi
@@ -88,10 +98,11 @@ ok "aero-helper"
 
 # ---- 7. 服务和权限 ----
 for app in AeroSpace AltTab; do
-    if pgrep -xq "$app"; then todo+=("退出 $app 并关掉它的开机启动（会和 yabai / ⌘⇥ 冲突）"); fi
+    if pgrep -xq "$app"; then todo+=("退出 $app 并关掉它的开机启动（会和 yabai / ⌥⇥ 冲突）"); fi
 done
 pgrep -xq yabai || yabai --start-service
 pgrep -xq skhd || skhd --start-service
+pgrep -xq sketchybar || brew services start sketchybar >/dev/null
 
 yabai_ok=0
 for _ in $(seq 20); do
@@ -104,6 +115,7 @@ skhd_ok=0
 [ -n "$skhd_pid" ] && [ "$(pgrep -x skhd || true)" = "$skhd_pid" ] && skhd_ok=1   # 没有权限时 skhd 会退出、被 launchd 重启
 if [ "$yabai_ok$skhd_ok" = 11 ]; then
     ok "yabai、skhd 在运行，有辅助功能权限"
+    "$AERO" reload   # yabai 先于 SketchyBar 启动时，yabairc 里给顶栏留空间的设置还没生效
 else
     open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
     todo+=("系统设置 → 隐私与安全性 → 辅助功能：打开 yabai 和 skhd（没有就点 + 从 /opt/homebrew/bin 添加），然后再运行一次本脚本")
@@ -123,7 +135,7 @@ fi
 
 echo
 if [ ${#todo[@]} -eq 0 ]; then
-    echo "全部完成。⌥1…⌥0 切换工作区，⌥⇧+数字 移动窗口，⌘⇥ 切换窗口。"
+    echo "全部完成。⌥1…⌥0 切换工作区，⌥⇧+数字 移动窗口，⌥⇥ 切换窗口。"
 else
     echo "还需要手动做："
     printf '  - %s\n' "${todo[@]}"

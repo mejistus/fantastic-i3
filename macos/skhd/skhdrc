@@ -4,9 +4,10 @@
 # 切换工作区（⌥1 … ⌥9 ⌥0 = 工作区 1 … 10）和 ⌃H/⌃L 在文件末尾 .load 的 workspaces.skhdrc 里：
 # 它由 aero keys 按 SA 是否可用，链接到 workspaces-sa.skhdrc 或 workspaces-native.skhdrc。
 
-:: default
-:: resize
-:: service
+# 进入每个模式时通知 SketchyBar 顶栏显示 / 隐藏 RESIZE、SERVICE（没装 SketchyBar 也不影响）
+:: default : sketchybar --trigger skhd_mode MODE=default 2>/dev/null
+:: resize  : sketchybar --trigger skhd_mode MODE=resize 2>/dev/null
+:: service : sketchybar --trigger skhd_mode MODE=service 2>/dev/null
 
 # ================================================================ mode.main
 
@@ -19,29 +20,21 @@ alt - left  : yabai -m window --focus west
 alt - down  : yabai -m window --focus south
 alt - up    : yabai -m window --focus north
 alt - right : yabai -m window --focus east
-# ⌘ + 方向键也能切换焦点（PC 键盘上是 Win+方向键）。
-# 代价：所有应用里 ⌘←→（行首 / 行尾）、⌘↑↓（文首 / 文末）、浏览器的 ⌘←→（后退 / 前进）、
-# 访达的 ⌘↑↓（上一级 / 打开）都被占掉
-cmd - left  : yabai -m window --focus west
-cmd - down  : yabai -m window --focus south
-cmd - up    : yabai -m window --focus north
-cmd - right : yabai -m window --focus east
 
 # move left/down/up/right
 alt + shift - h : yabai -m window --swap west
 alt + shift - j : yabai -m window --swap south
 alt + shift - k : yabai -m window --swap north
 alt + shift - l : yabai -m window --swap east
-# 方向键版：⌘⇧ + 方向键（PC 键盘上是 Win+Shift+方向键）。
-# 代价：所有应用里"选到行首 / 行尾 / 文首 / 文末"（⌘⇧←→↑↓）都被占掉
-cmd + shift - left  : yabai -m window --swap west
-cmd + shift - down  : yabai -m window --swap south
-cmd + shift - up    : yabai -m window --swap north
-cmd + shift - right : yabai -m window --swap east
+# 方向键版（代价：所有应用里按词选择 ⌥⇧←→、按段选择 ⌥⇧↑↓ 都被占掉）
+alt + shift - left  : yabai -m window --swap west
+alt + shift - down  : yabai -m window --swap south
+alt + shift - up    : yabai -m window --swap north
+alt + shift - right : yabai -m window --swap east
 
 # fullscreen / layout floating tiling
 alt - f         : $HOME/Documents/fantastic-i3/macos/yabai/aero fullscreen
-alt + shift - f : yabai -m window --toggle float
+alt + shift - f : $HOME/Documents/fantastic-i3/macos/yabai/aero toggle-float
 
 # resize smart -50 / +50（⌥- ⌥=）
 alt - 0x1B : $HOME/Documents/fantastic-i3/macos/yabai/aero resize smart -50
@@ -62,17 +55,26 @@ alt + shift - 0 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-wor
 # move-workspace-to-monitor --wrap-around next
 alt + shift - tab : $HOME/Documents/fantastic-i3/macos/yabai/aero move-workspace-to-monitor --wrap-around next
 
-# 窗口切换器（⌘⇥；macOS 自带的 ⌘⇥ 应用切换器由 yabairc 关掉了）
-#   快速按一下 = 回到上一个用过的窗口；按住 ⌘ = 弹出列表（同时切到英文输入法，打字直接搜索）
-# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：⌘⇥ 在列表里往下选，Esc 关闭
-cmd - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --auto
+# 窗口切换器（⌥⇥；⌘⇥ 还是 macOS 自带的应用切换器）
+#   快速按一下 = 回到上一个用过的窗口；按住 ⌥ = 弹出列表（同时切到英文输入法，打字直接搜索）
+# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：⌥⇥ / ⌥⇧⇥ 在列表里往下 / 往上选，Esc 关闭
+alt - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --auto
 .blacklist [
     "aero-helper"
 ]
 
-# 当前工作区开 Finder / 跳到 Safari
+# 当前工作区开 Finder
 alt - d   : $HOME/Documents/fantastic-i3/macos/new_window_here
-alt - g   : $HOME/Documents/fantastic-i3/macos/yabai/focus_safari
+
+# 工作区别名（用 aero workspace，有没有 SA 都能用）：⌥B = ⌥4，⌥T = ⌥5，⌥Z = ⌥8，⌥C = ⌥9
+alt - b : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 4
+alt - t : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 5
+alt - z : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 8
+alt - c : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 9
+# ⌥G = 工作区 1 的默认浏览器：那里有它的窗口就切过去，没有就切到工作区 1 新开一个
+alt - g : $HOME/Documents/fantastic-i3/macos/yabai/focus_browser
+# ⌥ + Caps Lock = ⌥0（工作区 10）：skhd 绑不了 Caps Lock（外接键盘上改成了 🌐/fn），
+# 由 yabairc 启动的 aero-helper option-fn 监听
 
 # mode resize / mode service
 alt - r  ; resize
@@ -83,7 +85,7 @@ ctrl - s ; service
 
 service < escape : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero reload
 service < r      ; resize
-service < f      : $HOME/Documents/fantastic-i3/macos/yabai/aero tile-floating
+service < f      : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero toggle-space-float
 service < space  ; default
 service < j      : yabai -m window --toggle split; skhd -k "f20"
 service < h      : yabai -m window --insert east; skhd -k "f20"

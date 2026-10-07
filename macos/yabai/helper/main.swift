@@ -6,16 +6,29 @@
 //   aero-helper wait-release <shift,option,...> <秒>
 //       等这些修饰键全部松开；超时仍按着则退出码为 1。
 //   aero-helper native-cmd-tab on|off
-//       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器（关掉后 ⌘⇥ 才能交给 skhd）。
-//       效果持续到重新登录，所以 yabai 每次启动都执行一次 off。
+//       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器（关掉后 ⌘⇥ 才能交给 skhd）。效果持续到重新登录。
+//       现在窗口切换器用 ⌥⇥，⌘⇥ 保持 macOS 自带的，平时用不到这个命令。
 //   aero-helper switcher [--select 窗口id] [--apps] [--font-size N] [--width 屏幕宽度%] [--rows N]
 //       窗口切换列表。从 stdin 读 TSV：窗口id \t 桌面 \t 应用 \t 标题 \t 状态 \t pid
 //       --apps：列表末尾再加上 Dock 里亮着点、但没有窗口的应用（选中时输出 app:pid:bundle id）。
 //       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法。
-//       ↑↓ / ⇥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
+//       ↑↓ / ⇥⇧⇥ / ⌥⇥⌥⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
 //       ⌘+ / ⌘- 调整字号，⌘0 恢复默认；字号会记住。
+//   aero-helper default-browser
+//       打印默认浏览器的 bundle id 和正在运行的进程号：com.microsoft.edgemac<TAB>123 456
+//   aero-helper option-fn <命令>
+//       常驻：按住 ⌥ 时按下 🌐/fn（外接键盘上 Caps Lock 改成了它）或 Caps Lock，就用 /bin/sh 执行命令。
+//       skhd 绑不了修饰键，⌥ + Caps Lock 靠这个（yabairc 启动）。
+//   aero-helper date <模板>
+//       按系统的语言和地区格式化当前时间（DateFormatter 模板，如 MMMdEEEHm → 10月7日 週三 13:55）。
+//   aero-helper input-source
+//       打印当前输入法的简称：中文 → 中，日文 → あ，韩文 → 한，英文键盘布局 → EN。
+//   aero-helper bar-stats [秒]
+//       给 SketchyBar 送数据（常驻，由 sketchybarrc 启动）：每隔几秒（默认 2）推一次 CPU、内存、
+//       GPU（利用率和占用的内存）、网速，磁盘每 30 秒一次；切换输入法时立刻推输入法。SketchyBar 不在了就退出。
 //
-// 编译：aero 第一次用到时自动编译到 ~/.cache/fantastic-i3/aero-helper
+// 编译：aero 第一次用到时把 helper/*.swift 一起编译到 ~/.cache/fantastic-i3/aero-helper。
+// SketchyBar 的数据部分（bar-stats）在 bar.swift。
 
 import AppKit
 import Carbon
@@ -81,6 +94,75 @@ func setNativeCommandTab(_ enabled: Bool) {
 func selectEnglishInput() {
     guard let english = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue() else { return }
     TISSelectInputSource(english)
+}
+
+/// 当前输入法的简称：中文输入法 → 中，日文 → あ，韩文 → 한，其他（英文键盘布局等）→ 语言代码大写
+func inputSourceLabel() -> String {
+    let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+    var language = "en"
+    if let p = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages),
+       let first = (Unmanaged<CFArray>.fromOpaque(p).takeUnretainedValue() as? [String])?.first {
+        language = first
+    }
+    switch language.prefix(2) {
+    case "zh": return "中"
+    case "ja": return "あ"
+    case "ko": return "한"
+    default: return language.prefix(2).uppercased()
+    }
+}
+
+// MARK: - 默认浏览器
+
+func defaultBrowser() -> (bundle: String, pids: [pid_t])? {
+    guard let url = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!),
+          let bundle = Bundle(url: url)?.bundleIdentifier else { return nil }
+    return (bundle, NSRunningApplication.runningApplications(withBundleIdentifier: bundle).map(\.processIdentifier))
+}
+
+// MARK: - ⌥ + Caps Lock
+
+// 事件回调是 C 函数，不能捕获变量，只能用全局的
+var optionFnCommand = ""
+var optionFnTap: CFMachPort?
+var optionFnLastFlags: CGEventFlags = []
+
+let optionFnCallback: CGEventTapCallBack = { _, type, event, _ in
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let tap = optionFnTap { CGEvent.tapEnable(tap: tap, enable: true) }
+        return Unmanaged.passUnretained(event)
+    }
+    let flags = event.flags
+    let pressed: Bool
+    switch event.getIntegerValueField(.keyboardEventKeycode) {
+    case 63: pressed = flags.contains(.maskSecondaryFn) && !optionFnLastFlags.contains(.maskSecondaryFn)  // 🌐/fn 按下
+    case 57: pressed = true   // 没改过的 Caps Lock：每按一下只来一次（切换大小写锁定）
+    default: pressed = false
+    }
+    optionFnLastFlags = flags
+    if pressed && flags.contains(.maskAlternate) && flags.intersection([.maskCommand, .maskControl, .maskShift]).isEmpty {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", optionFnCommand]
+        try? process.run()
+    }
+    return Unmanaged.passUnretained(event)
+}
+
+/// 主动式事件监听（只看不改）：和 skhd 一样只需要辅助功能权限（被动式的要"输入监控"权限）
+func watchOptionFn(command: String) -> Never {
+    optionFnCommand = command
+    guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                      eventsOfInterest: CGEventMask(1 << CGEventType.flagsChanged.rawValue),
+                                      callback: optionFnCallback, userInfo: nil) else {
+        FileHandle.standardError.write("aero-helper option-fn：建不了事件监听（缺辅助功能权限？）\n".data(using: .utf8)!)
+        exit(1)
+    }
+    optionFnTap = tap
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+    CFRunLoopRun()
+    exit(0)
 }
 
 // MARK: - 窗口切换列表
@@ -246,7 +328,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            // ⌘⇥ / ⌘⇧⇥ 往下 / 往上选（⌥⇥ 也一样，免得在搜索框里打出制表符）
+            // ⌥⇥ / ⌥⇧⇥ 往下 / 往上选（⌘⇥ 也一样）；不拦下来的话 ⌥⇥ 会在搜索框里打出制表符
             if event.keyCode == 48 {
                 let shift = event.modifierFlags.contains(.shift)
                 if !event.modifierFlags.intersection([.command, .option]).isEmpty {
@@ -433,6 +515,23 @@ case "wait-release":
     exit(waitRelease(mask, timeout: timeout) ? 0 : 1)
 case "native-cmd-tab":
     setNativeCommandTab(arguments.dropFirst().first == "on")
+case "default-browser":
+    guard let browser = defaultBrowser() else { exit(1) }
+    print("\(browser.bundle)\t\(browser.pids.map(String.init).joined(separator: " "))")
+case "option-fn":
+    let command = arguments.dropFirst().joined(separator: " ")
+    guard !command.isEmpty else { exit(2) }
+    watchOptionFn(command: command)
+case "date":
+    let formatter = DateFormatter()
+    formatter.locale = Locale.current   // 系统设置里的语言和地区，不受 LANG 影响
+    formatter.setLocalizedDateFormatFromTemplate(arguments.dropFirst().first ?? "MMMdEEEHm")
+    print(formatter.string(from: Date()))
+case "input-source":
+    print(inputSourceLabel())
+case "bar-stats":
+    let stats = BarStats()   // 要留着强引用：定时器和通知的回调用的是 weak self
+    stats.run(interval: Double(arguments.dropFirst().first ?? "") ?? 2)
 case "switcher":
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
@@ -440,6 +539,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | bar-stats [秒]\n".data(using: .utf8)!)
     exit(2)
 }
