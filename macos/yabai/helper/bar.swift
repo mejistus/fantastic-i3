@@ -43,10 +43,16 @@ func durationText(minutes: Int) -> String {
 
 /// 超过 warn / alert 变黄 / 变红（颜色和 sketchybar/colors.sh 一致）
 func levelColor(_ percent: Double, warn: Double = 60, alert: Double = 85) -> String {
-    percent >= alert ? "0xffe06c75" : percent >= warn ? "0xffe5c07b" : "0xffeaeaea"
+    percent >= alert ? red : percent >= warn ? yellow : foreground
 }
 
-let green = "0xff98c379", yellow = "0xffe5c07b", red = "0xffe06c75", foreground = "0xffeaeaea"
+/// 主题（sketchybar 的主题开关写进 defaults：fantastic-i3.sketchybar theme = color / mono）。
+/// 黑白主题里表示"正常"的绿和装饰用的强调色都换成白，表示警告的黄、红保留。
+/// 切换主题时 SketchyBar 重新加载、bar-stats 跟着重启，所以启动时读一次就够
+let monochrome = UserDefaults(suiteName: "fantastic-i3.sketchybar")?.string(forKey: "theme") == "mono"
+let yellow = "0xffe5c07b", red = "0xffe06c75", foreground = "0xffeaeaea"
+let green = monochrome ? foreground : "0xff98c379"
+let accent = monochrome ? foreground : yellow   // 当前输入法前面的标记
 
 func sysctlString(_ name: String) -> String? {
     var size = 0
@@ -378,7 +384,9 @@ final class BarStats {
 
     // 栏上的图标（Maple Mono NF 里的 Nerd Font 字形）
     let wifiIcon = "\u{F05A9}", ethernetIcon = "\u{F0200}", vpnIcon = "\u{F0582}", otherIcon = "\u{F059F}", offlineIcon = "\u{F05AA}"
-    let downArrow = "\u{F19B3}", upArrow = "\u{F19B2}"
+    /// 栏上属于同一项的几块：网速拆成了 net（类型图标）、net.rx（↓）、net.tx（↑），箭头才能单独上色。
+    /// 鼠标在这几块之间移动时面板不收
+    let barParts = ["net": ["net.rx", "net.tx"]]
 
     func run(interval: TimeInterval) {
         DistributedNotificationCenter.default().addObserver(
@@ -463,7 +471,7 @@ final class BarStats {
                      "--push", "gpu.history", String(format: "%.3f", Double(gpu.utilization) / 100)]
         }
 
-        args += ["--set", "net"] + network()
+        args += network()
 
         // 磁盘读写速度（弹出面板用），已用百分比 30 秒一次
         let io = diskIOBytes(), now = Date()
@@ -488,13 +496,14 @@ final class BarStats {
         return value == 100 ? "label=100" : "label=\(value)%"
     }
 
-    /// 栏上的网络：主网卡（默认路由所在的）类型图标和上下行速度
+    /// 栏上的网络：主网卡（默认路由所在的）类型图标和上下行速度，分别推给 net / net.rx / net.tx
     func network() -> [String] {
         guard let store, let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
               let name = global["PrimaryInterface"] as? String, let bytes = interfaceBytes(name) else {
             lastNet = nil
             net = ("", .other, 0, 0)
-            return ["icon=\(offlineIcon)", "label=离线"]
+            return ["--set", "net", "icon=\(offlineIcon)", "--set", "net.rx", "icon.drawing=off", "label=离线",
+                    "--set", "net.tx", "drawing=off"]
         }
         let now = Date()
         var down = 0.0, up = 0.0
@@ -507,11 +516,11 @@ final class BarStats {
         let kind = interfaceKind(name)
         net = (name, kind, down, up)
         let icon = [InterfaceKind.wifi: wifiIcon, .ethernet: ethernetIcon, .vpn: vpnIcon][kind] ?? otherIcon
-        return ["icon=\(icon)", "label=\(downArrow)\(rate(down)) \(upArrow)\(rate(up))"]
+        return ["--set", "net", "icon=\(icon)", "--set", "net.rx", "icon.drawing=on", "label=\(rate(down))",
+                "--set", "net.tx", "drawing=on", "label=\(rate(up))"]
     }
 
-    /// 栏上的速度，数字贴着箭头，后面补空格到 5 个字符（等宽字体下 ↑ 的位置不跳）："999B " "12.3K" "456K " "1.2M "。
-    /// 行尾的空格不算宽度，整行宽度由 sketchybarrc 里固定的 label.width 管
+    /// 栏上的速度："999B" "12.3K" "456K" "1.2M"。不补空格：宽度由 sketchybarrc 里固定的 label.width 管（左对齐）
     func rate(_ bytesPerSecond: Double) -> String {
         let text: String
         switch bytesPerSecond {
@@ -521,7 +530,7 @@ final class BarStats {
         case ..<10_000_000: text = String(format: "%.1fM", bytesPerSecond / 1_000_000)
         default: text = "\(Int(bytesPerSecond / 1_000_000))M"
         }
-        return text + String(repeating: " ", count: max(0, 5 - text.count))
+        return text
     }
 
     // MARK: 弹出面板
@@ -557,7 +566,7 @@ final class BarStats {
         return CGRect(x: origin[0], y: origin[1], width: size[0], height: size[1])
     }
 
-    /// 面板打开后：量出这一项加面板（标题行到最后的提示行）占的区域，开始盯鼠标。
+    /// 面板打开后：量出这一项（连同 barParts 里的几块）加面板（标题行到最后的提示行）占的区域，开始盯鼠标。
     /// 面板还没画出来（量不到）就过一会儿再量，最多试 5 次
     func watchPopup(_ item: String, attempt: Int = 1) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
@@ -566,7 +575,9 @@ final class BarStats {
                 if attempt < 5 { self.watchPopup(item, attempt: attempt + 1) }
                 return
             }
-            self.popup = (item, bar.union(top).union(bottom).insetBy(dx: -10, dy: -10), nil)
+            let parts = (self.barParts[item] ?? []).compactMap { self.frame($0) }
+            let area = parts.reduce(bar.union(top).union(bottom)) { $0.union($1) }
+            self.popup = (item, area.insetBy(dx: -10, dy: -10), nil)
             if self.popupTimer == nil {
                 self.popupTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.checkPointer() }
             }
@@ -695,7 +706,7 @@ final class BarStats {
             for i in 0..<5 {
                 if i < sources.count {
                     args += ["--set", "input.src.\(i)", "drawing=on", "icon=\(sources[i].current ? "\u{F043E}" : "\u{F043D}")",
-                             "icon.color=\(sources[i].current ? yellow : "0xff5c6370")", "label=\(sources[i].name)",
+                             "icon.color=\(sources[i].current ? accent : "0xff5c6370")", "label=\(sources[i].name)",
                              "label.color=\(sources[i].current ? foreground : "0xff9c9c9c")"]
                 } else {
                     hide("src.\(i)", true)

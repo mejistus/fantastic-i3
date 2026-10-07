@@ -1,5 +1,5 @@
 #!/bin/bash
-# 电池：图标随电量变，接着电源时换成充电图标；低于 20% 变红、40% 变黄。没有电池（台式机）就不显示。
+# 电池：图标随电量变，接着电源时换成充电图标；低于 20% 变红、40% 变黄（黑白主题也是）。没有电池（台式机）就不显示。
 # 鼠标悬停、点击：交给 hover.sh
 case "$SENDER" in
     mouse.entered | mouse.exited.global | mouse.clicked) exec "$CONFIG_DIR/plugins/hover.sh" ;;
@@ -19,8 +19,8 @@ if grep -q "AC Power" <<<"$info"; then
     color=$GREEN
 else
     icons=(󰂎 󰁺 󰁻 󰁼 󰁽 󰁾 󰁿 󰂀 󰂁 󰂂 󰁹)
-    if [ "$percent" -lt 20 ]; then color=$RED
-    elif [ "$percent" -lt 40 ]; then color=$YELLOW
+    if [ "$percent" -lt 20 ]; then color=$ALERT
+    elif [ "$percent" -lt 40 ]; then color=$WARN
     else color=$GREEN
     fi
 fi
