@@ -2,7 +2,7 @@
 # 配色和文字字体。彩色主题是 One Dark，底色和前景色与 polybar（../../polybar/color.ini）一致。格式 0xAARRGGBB。
 # 主题：color（彩色）/ mono（黑白，像原生菜单栏：图标、文字、曲线都是白色，文字用系统字体，
 #       只有表示警告的 WARN / ALERT 保留黄、红）。
-# 栏最右边的开关（plugins/theme.sh）切换，记在 defaults 的 fantastic-i3.sketchybar theme 里（aero-helper 也读它）
+# 栏右边一组最左边的开关（plugins/theme.sh）切换，记在 defaults 的 fantastic-i3.sketchybar theme 里（aero-helper 也读它）
 export THEME=$(defaults read fantastic-i3.sketchybar theme 2>/dev/null || echo color)
 export BAR_COLOR=0x00282c34   # 栏底色全透明：底色完全交给 aero-helper bar-backdrop 的底板（和原生菜单栏一样是模糊的壁纸）。
                               # 想更不透就加大前两位（00 → 40 → 80），叠一层 #282c34 的深色
