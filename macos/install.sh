@@ -9,8 +9,8 @@
 #   4. 链接配置：~/.config/yabai/yabairc、~/.config/skhd/skhdrc、~/.config/sketchybar（原来的会备份）
 #   5. 关掉调度中心的"根据最近的使用情况自动重新排列空间"（否则桌面顺序会变，工作区编号就乱了）；
 #      菜单栏设为自动隐藏（顶上换成 SketchyBar）
-#   6. 编译 aero-helper（窗口切换列表等）
-#   7. 启动 yabai、skhd、SketchyBar 服务，检查辅助功能权限
+#   6. 编译 aero-helper（窗口切换列表、顶栏的数据和底板、锁屏等，helper/*.swift）
+#   7. 启动 yabai、skhd、SketchyBar 服务（SketchyBar 已经在跑就重新加载，用上链接好的配置），检查辅助功能权限
 #   8. 检查桌面够不够 10 个
 #
 # 要自己动手的：给 yabai、skhd 辅助功能权限（脚本会打开设置页面）；在调度中心里把桌面加到 10 个。
@@ -93,7 +93,7 @@ fi
 # ---- 6. aero-helper ----
 "$AERO" helper >/dev/null 2>&1 || true    # 不带参数：需要时编译，然后只打印用法
 [ -x "$HOME/.cache/fantastic-i3/aero-helper" ] ||
-    die "aero-helper 编译失败：swiftc -O -o ~/.cache/fantastic-i3/aero-helper $HOME_REPO/macos/yabai/helper/main.swift"
+    die "aero-helper 编译失败：swiftc -O -o ~/.cache/fantastic-i3/aero-helper $HOME_REPO/macos/yabai/helper/*.swift"
 ok "aero-helper"
 
 # ---- 7. 服务和权限 ----
@@ -102,7 +102,11 @@ for app in AeroSpace AltTab; do
 done
 pgrep -xq yabai || yabai --start-service
 pgrep -xq skhd || skhd --start-service
-pgrep -xq sketchybar || brew services start sketchybar >/dev/null
+if pgrep -xq sketchybar; then
+    sketchybar --reload "$HOME/.config/sketchybar/sketchybarrc"   # 之前装过、还在用旧配置：换成刚链接的
+else
+    brew services start sketchybar >/dev/null
+fi
 
 yabai_ok=0
 for _ in $(seq 20); do
