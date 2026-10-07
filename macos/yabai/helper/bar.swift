@@ -652,14 +652,16 @@ final class BarStats {
         return all.min { distance($0) < distance($1) }
     }
 
-    /// 面板打开后：量出这一项（连同 barParts 里的几块）加面板（标题行到最后的提示行）占的区域，开始盯鼠标。
+    /// 面板打开后：量出这一项（连同 barParts 里的几块）加面板（第一行到最后一行）占的区域，开始盯鼠标。
     /// 面板还没画出来（量不到）就过一会儿再量，最多试 5 次
     func watchPopup(_ item: String, attempt: Int = 1) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, self.hovered() == item else { return }
-            // 面板只在一块屏上：先量面板，再挑和它同一块屏上的那一项
-            guard let top = self.frame("\(item).title"), let bottom = self.frame("\(item).hint", near: top),
-                  let bar = self.frame(item, near: top) else {
+            // 面板只在一块屏上：先量面板（从两头找第一个画出来的行），再挑和它同一块屏上的那一项
+            let rows = (self.query(item)?["popup"] as? [String: Any])?["items"] as? [String] ?? []
+            let top = rows.lazy.compactMap { self.frame($0) }.first
+            let bottom = top.flatMap { top in rows.reversed().lazy.compactMap { self.frame($0, near: top) }.first }
+            guard let top, let bottom, let bar = self.frame(item, near: top) else {
                 if attempt < 5 { self.watchPopup(item, attempt: attempt + 1) }
                 return
             }

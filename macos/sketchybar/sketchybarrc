@@ -2,7 +2,7 @@
 # SketchyBar 顶栏 —— 仿 polybar（../../polybar），替代 macOS 菜单栏（菜单栏设为自动隐藏，鼠标移到屏幕顶上才出来）。
 # 链接到 ~/.config/sketchybar。高 32、One Dark 配色、Maple Mono NF 字体，和 i3 那边一致。
 #
-#   左：工作区 1-10（数字 + 上面窗口的应用图标；当前的高亮，点一下切过去）、skhd 模式、当前应用和窗口标题
+#   左：苹果菜单（ ）、工作区 1-10（数字 + 上面窗口的应用图标；当前的高亮，点一下切过去）、skhd 模式、当前应用和窗口标题
 #   右：主题开关、GPU（利用率 + 占用的内存）、CPU（曲线）、内存、磁盘、网速、输入法、音量、电池、日期时间
 #
 # GPU / CPU / 内存 / 磁盘 / 网速 / 输入法由 aero-helper bar-stats 推送（../yabai/helper/main.swift）；
@@ -31,14 +31,20 @@ pkill -f "^$HELPER bar-backdrop" 2>/dev/null
 sketchybar --bar position=top height=24 color=$BAR_COLOR shadow=off sticky=on topmost=window \
     padding_left=8 padding_right=8 display=all font_smoothing=on
 
+# 图标比文字大一些：和原生菜单栏比过，原生的状态图标高 12–16，Maple Mono NF 18 号的图标高 11–15（15 号时只有 9–12.5）
 sketchybar --default updates=when_shown padding_left=3 padding_right=3 \
-    icon.font="$FONT:Bold:15.0" icon.color=$FG icon.padding_left=4 icon.padding_right=4 \
+    icon.font="$FONT:Bold:18.0" icon.color=$FG icon.padding_left=4 icon.padding_right=4 \
     label.font="$TEXT_FONT:$SEMIBOLD:13.0" label.font.features=tnum label.color=$FG label.padding_left=2 label.padding_right=4
 
 # 自定义事件：yabairc 触发 window_focus / title_change，skhdrc 触发 skhd_mode
 sketchybar --add event window_focus --add event title_change --add event skhd_mode
 
 # ================================================================ 左
+
+# 苹果菜单（像原生菜单栏最左边的 ，系统字体里的苹果标志）：点一下弹出菜单（plugins/apple.sh），菜单的行在下面
+sketchybar --add item apple left \
+    --set apple icon= icon.font=".AppleSystemUIFont:Bold:20.0" icon.color=$FG icon.padding_left=6 icon.padding_right=10 \
+        label.drawing=off script="$PLUGINS/apple.sh"
 
 # 工作区 1-10：当前的有底色、数字变蓝；有窗口的数字亮、后面跟应用图标；空的数字变暗
 for i in 1 2 3 4 5 6 7 8 9 10; do
@@ -158,6 +164,35 @@ popup_hint() { # <项> <文字>：最下面一行灰色的操作提示
         --set "$1.hint" width=$POPUP_WIDTH icon.drawing=off label="$2" label.font="$TEXT_FONT:$REGULAR:11.0" \
             label.color=$FG_DIM label.padding_left=14
 }
+
+# ---- 苹果菜单的行（ 在栏的最左边，见上面）：和原生的一样分几组，点一行执行 plugins/apple.sh 里对应的操作 ----
+MENU_WIDTH=230
+menu_row() { # <行> <图标> <文字>
+    sketchybar --add item "apple.$1" popup.apple \
+        --set "apple.$1" width=$MENU_WIDTH icon="$2" icon.font="$FONT:Bold:14.0" icon.color=$FG icon.width=30 \
+            icon.padding_left=14 label="$3" label.font="$TEXT_FONT:$MEDIUM:13.0" label.color=$FG \
+            script="$PLUGINS/apple.sh" \
+        --subscribe "apple.$1" mouse.clicked
+}
+menu_sep() { # <行>：分隔线
+    sketchybar --add item "apple.$1" popup.apple \
+        --set "apple.$1" width=$MENU_WIDTH icon.drawing=off label.drawing=off \
+            background.drawing=on background.height=1 background.color=$ITEM_BG \
+            background.padding_left=14 background.padding_right=14
+}
+popup apple mouse.clicked
+sketchybar --set apple popup.align=left
+menu_row about 󰋼 "关于本机"
+menu_sep sep1
+menu_row settings 󰒓 "系统设置…"
+menu_row appstore 󰓜 "App Store…"
+menu_sep sep2
+menu_row sleep 󰒲 "睡眠"
+menu_row restart 󰜉 "重新启动…"
+menu_row shutdown 󰐥 "关机…"
+menu_sep sep3
+menu_row lock 󰌾 "锁定屏幕"
+menu_row logout 󰍃 "退出登录 ${USER}…"
 
 # ---- 日期时间 ----
 sketchybar --add item clock right \

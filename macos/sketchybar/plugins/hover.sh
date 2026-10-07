@@ -10,7 +10,7 @@
 STATE="/tmp/yabai-aero-$USER"
 HELPER="$HOME/.cache/fantastic-i3/aero-helper"
 AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
-POPUPS="gpu cpu mem disk net input volume battery clock"
+POPUPS="gpu cpu mem disk net input volume battery clock apple"   # apple：苹果菜单，悬停别的项时也收起
 ITEM=${NAME%%.*}
 
 case "$SENDER" in
