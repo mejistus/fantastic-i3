@@ -26,9 +26,12 @@
 //   aero-helper bar-stats [秒]
 //       给 SketchyBar 送数据（常驻，由 sketchybarrc 启动）：每隔几秒（默认 2）推一次 CPU、内存、
 //       GPU（利用率和占用的内存）、网速，磁盘每 30 秒一次；切换输入法时立刻推输入法。SketchyBar 不在了就退出。
+//   aero-helper bar-backdrop
+//       SketchyBar 栏下面的底板（常驻，由 sketchybarrc 启动）：和原生菜单栏一样，是屏幕顶上那块壁纸大半径模糊、
+//       略微压暗后的样子；读不到壁纸时用系统的磨砂材质。高度跟着栏走，SketchyBar 不在了就退出。
 //
 // 编译：aero 第一次用到时把 helper/*.swift 一起编译到 ~/.cache/fantastic-i3/aero-helper。
-// SketchyBar 的数据部分（bar-stats）在 bar.swift。
+// SketchyBar 的数据部分（bar-stats）在 bar.swift，磨砂底板（bar-backdrop）在 backdrop.swift。
 
 import AppKit
 import Carbon
@@ -532,6 +535,9 @@ case "input-source":
 case "bar-stats":
     let stats = BarStats()   // 要留着强引用：定时器和通知的回调用的是 weak self
     stats.run(interval: Double(arguments.dropFirst().first ?? "") ?? 2)
+case "bar-backdrop":
+    let backdrop = BarBackdrop()   // 同上，要留着强引用
+    backdrop.run()
 case "switcher":
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
@@ -539,6 +545,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | bar-stats [秒]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | bar-stats [秒] | bar-backdrop\n".data(using: .utf8)!)
     exit(2)
 }

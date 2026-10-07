@@ -48,9 +48,9 @@ yabai -m signal --add event=space_changed action="$AERO ensure-focus"
 # 记录窗口的使用顺序，⌥⇥ 窗口切换器按它排序（上一个用过的窗口排第一）
 yabai -m signal --add event=window_focused action="$AERO mru-push \$YABAI_WINDOW_ID"
 
-# SketchyBar 顶栏（../sketchybar）：顶上给它留出 32 的高度（菜单栏已设为自动隐藏），焦点窗口 / 标题变了通知它
+# SketchyBar 顶栏（../sketchybar）：顶上给它留出 24 的高度（和系统菜单栏一样高，菜单栏已设为自动隐藏），焦点窗口 / 标题变了通知它
 if command -v sketchybar >/dev/null 2>&1; then
-    yabai -m config external_bar all:32:0
+    yabai -m config external_bar all:24:0
     yabai -m signal --add event=window_focused action="sketchybar --trigger window_focus"
     yabai -m signal --add event=window_title_changed action="sketchybar --trigger title_change"
 fi

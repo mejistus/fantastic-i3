@@ -21,7 +21,7 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
     if [ -n "${icons[i]}" ]; then
         args+=(--set "space.$i" label="${icons[i]# }" label.drawing=on icon.color="$FG")
     else
-        args+=(--set "space.$i" label.drawing=off icon.color="$FG_DIM")
+        args+=(--set "space.$i" label.drawing=off icon.color="$FG_FAINT")
     fi
 done
 sketchybar "${args[@]}"

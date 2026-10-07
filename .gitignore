@@ -1,2 +1,5 @@
 # macOS Finder 的文件夹显示设置
 .DS_Store
+
+# Claude Code 的本地文件（会话设置、临时工作区）
+.claude/
