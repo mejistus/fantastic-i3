@@ -7,8 +7,8 @@
 //
 // 窗口层级 2：普通窗口（0）之上，SketchyBar 的栏（topmost=window，浮动窗口层级 3）之下。不接收鼠标，
 // 所有桌面都显示。每 3 秒问一次 SketchyBar 栏的高度和是否隐藏，顺便看壁纸换没换（切换桌面时也看，
-// 每个桌面可以有不同的壁纸）；连着 3 次问不到（SketchyBar 不在了）就退出。
-// 刚启动时 SketchyBar 往往还在执行 sketchybarrc，问不到是正常的，先按 24 高建出来。
+// 每个桌面可以有不同的壁纸）。问不到时看 SketchyBar 的进程还在不在，不在了才退出：刚启动时它往往还在执行
+// sketchybarrc，睡眠唤醒后也要重建栏，这些时候都问不到（之前连着问不到 3 次就退出，唤醒后底板就没了）。
 
 import AppKit
 import CoreImage
@@ -20,7 +20,6 @@ final class BarBackdrop {
     var windows: [NSWindow] = []
     var height: CGFloat = 0
     var hidden = false
-    var failures = 0
     var wallpapers = ""   // 各屏的位置、壁纸路径和修改时间；变了就重画
 
     func run() {
@@ -38,12 +37,13 @@ final class BarBackdrop {
     /// 按 SketchyBar 现在的栏高和是否隐藏更新底板；连着 3 次问不到就退出
     func sync() {
         guard let bar = queryBar() else {
-            failures += 1
-            if failures >= 3 { exit(0) }
-            if windows.isEmpty { height = 24; rebuild() }
+            if !sketchybarRunning() {
+                logLine("bar-backdrop 退出：SketchyBar 不在了")
+                exit(0)
+            }
+            if windows.isEmpty { height = 24; rebuild() }   // 先按 24 高建出来
             return
         }
-        failures = 0
         let newHeight = CGFloat((bar["height"] as? NSNumber)?.doubleValue ?? 24)
         let newHidden = (bar["hidden"] as? String) == "on" || (bar["position"] as? String) == "bottom"
         if newHeight != height || newHidden != hidden || windows.isEmpty {

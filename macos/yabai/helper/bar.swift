@@ -46,13 +46,34 @@ func levelColor(_ percent: Double, warn: Double = 60, alert: Double = 85) -> Str
     percent >= alert ? red : percent >= warn ? yellow : foreground
 }
 
-/// 主题（sketchybar 的主题开关写进 defaults：fantastic-i3.sketchybar theme = color / mono）。
-/// 黑白主题里表示"正常"的绿和装饰用的强调色都换成白，表示警告的黄、红保留。
-/// 切换主题时 SketchyBar 重新加载、bar-stats 跟着重启，所以启动时读一次就够
-let monochrome = UserDefaults(suiteName: "fantastic-i3.sketchybar")?.string(forKey: "theme") == "mono"
-let yellow = "0xffe5c07b", red = "0xffe06c75", foreground = "0xffeaeaea"
-let green = monochrome ? foreground : "0xff98c379"
-let accent = monochrome ? foreground : yellow   // 当前输入法前面的标记
+/// 弹出面板的颜色（两种主题都是彩色的，和 sketchybar/colors.sh 的调色板一致）
+let green = "0xff98c379", yellow = "0xffe5c07b", red = "0xffe06c75", foreground = "0xffeaeaea"
+
+/// SketchyBar 的进程还在不在。sketchybar 命令失败不一定是它退出了：重新加载、睡眠唤醒后重建栏的那几秒里也会失败，
+/// 常驻的 bar-stats / bar-backdrop 只在进程真没了的时候才退出
+func sketchybarRunning() -> Bool {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+    process.arguments = ["-x", "sketchybar"]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    guard (try? process.run()) != nil else { return true }
+    process.waitUntilExit()
+    return process.terminationStatus == 0
+}
+
+/// 记一行到 aero.log（和 aero log 同一个文件），常驻进程退出时留个原因
+func logLine(_ text: String) {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    let line = "\(formatter.string(from: Date())) \(text)\n"
+    let path = "/tmp/yabai-aero-\(NSUserName())/aero.log"
+    if let handle = FileHandle(forWritingAtPath: path) {
+        handle.seekToEndOfFile()
+        handle.write(line.data(using: .utf8)!)
+        try? handle.close()
+    }
+}
 
 func sysctlString(_ name: String) -> String? {
     var size = 0
@@ -362,6 +383,12 @@ func formatted(_ date: Date, _ template: String) -> String {
 final class BarStats {
     let sketchybar = "/opt/homebrew/bin/sketchybar"
     let hoverFile = "/tmp/yabai-aero-\(NSUserName())/bar-hover"
+    /// CPU、GPU 最近的利用率（0–1），最多 historyLength 个点 = 弹出面板里曲线的宽度（sketchybarrc：POPUP_WIDTH - 28）。
+    /// 重新加载 SketchyBar 时这个进程会被停掉、曲线也会清零：停掉前存进 historyFile，新进程启动时读回来补上
+    var history: [String: [Double]] = ["cpu": [], "gpu": []]
+    let historyLength = 272
+    let historyFile = "/tmp/yabai-aero-\(NSUserName())/bar-history.json"
+    var termSource: DispatchSourceSignal?
     let memoryTotal = Double(ProcessInfo.processInfo.physicalMemory)
     let store = SCDynamicStoreCreate(nil, "aero-helper" as CFString, nil, nil)
     var signalSource: DispatchSourceSignal?
@@ -401,6 +428,12 @@ final class BarStats {
             self.watchPopup(item)
         }
         signalSource?.resume()
+        // 被停掉（sketchybarrc 重新加载时 pkill）之前把曲线的历史存下来
+        signal(SIGTERM, SIG_IGN)
+        termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        termSource?.setEventHandler { [weak self] in self?.quit() }
+        termSource?.resume()
+        restoreHistory()
 
         sendStatic()
         inputChanged()
@@ -418,9 +451,56 @@ final class BarStats {
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { exit(0) }
+        guard (try? process.run()) != nil else { quitIfGone(); return }
         process.waitUntilExit()
-        if process.terminationStatus != 0 { exit(0) }
+        if process.terminationStatus != 0 { quitIfGone() }
+    }
+
+    /// 命令失败了：SketchyBar 真不在了才退出，只是一时忙（重新加载、睡眠唤醒）就跳过这一次
+    func quitIfGone() {
+        if !sketchybarRunning() {
+            logLine("bar-stats 退出：SketchyBar 不在了")
+            quit()
+        }
+    }
+
+    func quit() -> Never {
+        if let data = try? JSONSerialization.data(withJSONObject: history) {
+            try? data.write(to: URL(fileURLWithPath: historyFile))
+        }
+        exit(0)
+    }
+
+    /// 读回上一个进程存的历史（2 分钟以内的才算），补到栏上的曲线里（按时间顺序推，栏上的曲线只留最后那几个点）
+    func restoreHistory() {
+        let url = URL(fileURLWithPath: historyFile)
+        guard let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+              Date().timeIntervalSince(modified) < 120,
+              let data = try? Data(contentsOf: url), let saved = try? JSONSerialization.jsonObject(with: data) as? [String: [Double]]
+        else { return }
+        var args: [String] = []
+        for item in ["cpu", "gpu"] {
+            let values = Array((saved[item] ?? []).suffix(historyLength))
+            history[item] = values
+            if !values.isEmpty { args += ["--push", item] + values.map { String(format: "%.3f", $0) } }
+        }
+        send(args)
+    }
+
+    func record(_ item: String, _ value: Double) {
+        history[item, default: []].append(value)
+        if history[item]!.count > historyLength { history[item]!.removeFirst(history[item]!.count - historyLength) }
+    }
+
+    /// 弹出面板里的曲线：SketchyBar 画弹出面板里的曲线时最新的点在最左边，和栏上（最新在右）反着。
+    /// 所以面板开着时每次把整段历史重推一遍，顺序排成画出来最新在右：先推最旧的一个，再从最新推到第二旧的
+    /// （曲线是个环形缓冲区，推满一圈后第 i 个推进去的点画在第 i 个位置，第 0 个在最左边，其余从第 width-1 个往右排）。
+    /// 不够一圈的用 0 补在最旧那头
+    func historyPush(_ item: String) -> [String] {
+        let values = history[item] ?? []
+        let full = [Double](repeating: 0, count: max(0, historyLength - values.count)) + values.suffix(historyLength)
+        let order = [full[0]] + full[1...].reversed()
+        return ["--push", "\(item).history"] + order.map { String(format: "%.3f", $0) }
     }
 
     func hovered() -> String? {
@@ -460,15 +540,16 @@ final class BarStats {
         }
         lastCPU = ticksNow
         let cpuPercent = 100 - cpu.idle
-        args += ["--push", "cpu", String(format: "%.3f", cpuPercent / 100), "--push", "cpu.history", String(format: "%.3f", cpuPercent / 100),
-                 "--set", "cpu", percentLabel(cpuPercent)]
+        record("cpu", cpuPercent / 100)
+        args += ["--push", "cpu", String(format: "%.3f", cpuPercent / 100), "--set", "cpu", percentLabel(cpuPercent)]
 
         let memPercent = memoryInfo().used / memoryTotal * 100
         args += ["--set", "mem", percentLabel(memPercent)]
 
         if let gpu = gpuInfo() {
+            record("gpu", Double(gpu.utilization) / 100)
             args += ["--set", "gpu", percentLabel(Double(gpu.utilization)),
-                     "--push", "gpu.history", String(format: "%.3f", Double(gpu.utilization) / 100)]
+                     "--push", "gpu", String(format: "%.3f", Double(gpu.utilization) / 100)]
         }
 
         args += network()
@@ -520,17 +601,16 @@ final class BarStats {
                 "--set", "net.tx", "drawing=on", "label=\(rate(up))"]
     }
 
-    /// 栏上的速度："999B" "12.3K" "456K" "1.2M"。不补空格：宽度由 sketchybarrc 里固定的 label.width 管（左对齐）
+    /// 栏上的速度，最多 4 个字符："999B" "9.9K" "456K" "1.2M" "12M"（字符少，固定宽度就窄，数字短时空出来的也少）。
+    /// 不补空格：宽度由 sketchybarrc 里固定的 label.width 管（左对齐）
     func rate(_ bytesPerSecond: Double) -> String {
-        let text: String
         switch bytesPerSecond {
-        case ..<1000: text = "\(Int(bytesPerSecond))B"
-        case ..<10_000: text = String(format: "%.1fK", bytesPerSecond / 1000)
-        case ..<1_000_000: text = "\(Int(bytesPerSecond / 1000))K"
-        case ..<10_000_000: text = String(format: "%.1fM", bytesPerSecond / 1_000_000)
-        default: text = "\(Int(bytesPerSecond / 1_000_000))M"
+        case ..<1000: return "\(Int(bytesPerSecond))B"
+        case ..<9_950: return String(format: "%.1fK", bytesPerSecond / 1000)
+        case ..<999_500: return "\(Int((bytesPerSecond / 1000).rounded()))K"
+        case ..<9_950_000: return String(format: "%.1fM", bytesPerSecond / 1_000_000)
+        default: return "\(Int((bytesPerSecond / 1_000_000).rounded()))M"
         }
-        return text
     }
 
     // MARK: 弹出面板
@@ -558,12 +638,18 @@ final class BarStats {
     }
 
     /// 某一项（或面板里某一行）在屏幕上的位置；没画出来时是 nil
-    func frame(_ name: String) -> CGRect? {
-        guard let rects = query(name)?["bounding_rects"] as? [String: Any],
-              let rect = rects.values.first as? [String: Any],
-              let origin = rect["origin"] as? [Double], let size = rect["size"] as? [Double],
-              origin.count == 2, size.count == 2, origin[0] > -9000 else { return nil }
-        return CGRect(x: origin[0], y: origin[1], width: size[0], height: size[1])
+    /// 接了几块屏时栏上的项每块屏各有一个：给了 near 就挑离它最近的那个（和弹出面板在同一块屏上的）。
+    /// 以前随便取一个，取到另一块屏上的，和面板合起来的区域横跨两块屏，鼠标总在里面，面板就一直不收
+    func frame(_ name: String, near: CGRect? = nil) -> CGRect? {
+        guard let rects = query(name)?["bounding_rects"] as? [String: Any] else { return nil }
+        let all = rects.values.compactMap { value -> CGRect? in
+            guard let rect = value as? [String: Any], let origin = rect["origin"] as? [Double], let size = rect["size"] as? [Double],
+                  origin.count == 2, size.count == 2, origin[0] > -9000 else { return nil }
+            return CGRect(x: origin[0], y: origin[1], width: size[0], height: size[1])
+        }
+        guard let near else { return all.first }
+        let distance = { (r: CGRect) in hypot(r.midX - near.midX, r.midY - near.midY) }
+        return all.min { distance($0) < distance($1) }
     }
 
     /// 面板打开后：量出这一项（连同 barParts 里的几块）加面板（标题行到最后的提示行）占的区域，开始盯鼠标。
@@ -571,11 +657,13 @@ final class BarStats {
     func watchPopup(_ item: String, attempt: Int = 1) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, self.hovered() == item else { return }
-            guard let bar = self.frame(item), let top = self.frame("\(item).title"), let bottom = self.frame("\(item).hint") else {
+            // 面板只在一块屏上：先量面板，再挑和它同一块屏上的那一项
+            guard let top = self.frame("\(item).title"), let bottom = self.frame("\(item).hint", near: top),
+                  let bar = self.frame(item, near: top) else {
                 if attempt < 5 { self.watchPopup(item, attempt: attempt + 1) }
                 return
             }
-            let parts = (self.barParts[item] ?? []).compactMap { self.frame($0) }
+            let parts = (self.barParts[item] ?? []).compactMap { self.frame($0, near: top) }
             let area = parts.reduce(bar.union(top).union(bottom)) { $0.union($1) }
             self.popup = (item, area.insetBy(dx: -10, dy: -10), nil)
             if self.popupTimer == nil {
@@ -629,6 +717,7 @@ final class BarStats {
 
         switch item {
         case "gpu":
+            args += historyPush("gpu")
             guard let gpu = gpuInfo() else { break }
             row("util", "\(gpu.utilization)%", color: levelColor(Double(gpu.utilization)))
             row("render", "\(gpu.renderer)%")
@@ -637,6 +726,7 @@ final class BarStats {
             row("alloc", memoryText(gpu.allocated))
 
         case "cpu":
+            args += historyPush("cpu")
             row("user", String(format: "%.1f%%", cpu.user))
             row("system", String(format: "%.1f%%", cpu.system))
             row("idle", String(format: "%.1f%%", cpu.idle))
@@ -706,7 +796,7 @@ final class BarStats {
             for i in 0..<5 {
                 if i < sources.count {
                     args += ["--set", "input.src.\(i)", "drawing=on", "icon=\(sources[i].current ? "\u{F043E}" : "\u{F043D}")",
-                             "icon.color=\(sources[i].current ? accent : "0xff5c6370")", "label=\(sources[i].name)",
+                             "icon.color=\(sources[i].current ? yellow : "0xff5c6370")", "label=\(sources[i].name)",
                              "label.color=\(sources[i].current ? foreground : "0xff9c9c9c")"]
                 } else {
                     hide("src.\(i)", true)
@@ -734,9 +824,9 @@ final class BarStats {
             let full = battery["FullyCharged"] as? Bool ?? false
             let state = full ? "已充满" : charging ? "充电中" : external ? "已接电源，未充电" : "使用电池"
             row("title", "电池 · \(state)")
-            args += ["--set", "battery.bar", "slider.percentage=\(percent)",
-                     "slider.highlight_color=\(percent < 20 && !external ? red : percent < 40 && !external ? yellow : green)"]
-            row("level", "\(percent)%")
+            let charge = percent < 30 ? red : percent < 80 ? yellow : green   // 80% 以上绿，30–80% 黄，30% 以下红
+            args += ["--set", "battery.bar", "slider.percentage=\(percent)", "slider.highlight_color=\(charge)"]
+            row("level", "\(percent)%", color: charge)
             let minutes = charging ? battery["AvgTimeToFull"] as? Int : external ? nil : battery["AvgTimeToEmpty"] as? Int
             row("time", minutes.map { $0 >= 65535 ? "计算中…" : charging ? "\(durationText(minutes: $0))后充满" : "还能用 \(durationText(minutes: $0))" }
                 ?? (full ? "—" : "—"))

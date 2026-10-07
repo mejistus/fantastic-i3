@@ -44,7 +44,7 @@ sketchybar --add event window_focus --add event title_change --add event skhd_mo
 for i in 1 2 3 4 5 6 7 8 9 10; do
     sketchybar --add space space.$i left \
         --set space.$i space=$i icon=$i \
-            icon.font="$TEXT_FONT:$BOLD:13.0" icon.color=$FG_FAINT icon.highlight_color=$BLUE \
+            icon.font="$TEXT_FONT:$BOLD:13.0" icon.color=$FG_FAINT icon.highlight_color=$BAR_BLUE \
             icon.padding_left=8 icon.padding_right=6 \
             label.font="$APP_FONT:14.0" label.color=$FG_ALT label.highlight_color=$FG \
             label.padding_left=0 label.padding_right=8 label.y_offset=-1 label.drawing=off \
@@ -68,7 +68,7 @@ sketchybar --add item mode left \
 
 # 当前应用（图标 + 名字）和窗口标题（淡一些）
 sketchybar --add item front_app left \
-    --set front_app padding_left=12 icon.font="$APP_FONT:15.0" icon.color=$BLUE label.font="$TEXT_FONT:$APP_NAME:13.0" \
+    --set front_app padding_left=12 icon.font="$APP_FONT:15.0" icon.color=$BAR_BLUE label.font="$TEXT_FONT:$APP_NAME:13.0" \
         script="$PLUGINS/front_app.sh" \
     --subscribe front_app front_app_switched window_focus title_change system_woke \
     --add item window_title left \
@@ -87,7 +87,7 @@ LABEL_GAP=6
 ITEM_GAP=6
 # 宽度 = 最宽那个的字形宽度（colors.sh 里按主题的字体量好的 PERCENT_GLYPH / RATE_GLYPH）+ label 左右内边距。
 # Maple Mono SemiBold 13：两位数最宽 "40%" 22.5，满载 bar-stats 写 "100"（21.7，不带 %），所以容下两位数就够；
-# 网速的数字（Medium 12）最宽 "10.0M" 34.4。网速的内边距是 2 + 4（箭头和数字挨着）
+# 网速最多 4 个字符，数字（Medium 12）最宽 "400M" 27.5。网速的内边距是 2 + 4（箭头和数字挨着）
 PERCENT_WIDTH=$((PERCENT_GLYPH + LABEL_GAP + 4))
 RATE_WIDTH=$((RATE_GLYPH + 2 + 4))
 
@@ -104,7 +104,7 @@ popup() { # <项> [<事件> …]：面板样式 + 鼠标事件（默认悬停、
         --subscribe "$item" ${@:-mouse.entered mouse.exited.global mouse.clicked}
 }
 
-popup_title() { # <项> <图标> <颜色> [<标题>]：标题行，下面一条分隔线
+popup_title() { # <项> <图标> <颜色> [<标题>]：标题行，下面一条分隔线。调用时颜色用 BAR_*：黑白主题下标题也是白的，只有面板内容是彩色
     sketchybar --add item "$1.title" "popup.$1" \
         --set "$1.title" width=$POPUP_WIDTH icon="$2" icon.color="$3" icon.font="$FONT:Bold:16.0" \
             icon.padding_left=14 icon.padding_right=8 label="${4:-}" label.font="$TEXT_FONT:$BOLD:13.0" label.color=$FG \
@@ -161,10 +161,10 @@ popup_hint() { # <项> <文字>：最下面一行灰色的操作提示
 
 # ---- 日期时间 ----
 sketchybar --add item clock right \
-    --set clock icon=󰅐 icon.color=$BLUE update_freq=15 \
+    --set clock icon=󰅐 icon.color=$BAR_BLUE update_freq=15 \
         script="$PLUGINS/clock.sh"
 popup clock
-popup_title clock 󰸗 $BLUE
+popup_title clock 󰸗 $BAR_BLUE
 popup_rows clock lunar=农历 week=星期 zone=时区
 popup_hint clock "点击打开日历"
 
@@ -173,17 +173,17 @@ sketchybar --add item battery right \
     --set battery update_freq=120 script="$PLUGINS/battery.sh" \
     --subscribe battery power_source_change system_woke
 popup battery
-popup_title battery 󰁹 $GREEN
+popup_title battery 󰁹 $BAR_GREEN
 popup_bar battery bar
 popup_rows battery level=电量 time=剩余时间 power=电源 health=健康度 cycles=循环次数 temp=温度
 popup_hint battery "点击打开电池设置"
 
 # ---- 音量：单击静音 / 取消静音，滚轮调大小；面板里的滑块可以点 / 拖 ----
 sketchybar --add item volume right \
-    --set volume icon.color=$ORANGE script="$PLUGINS/volume.sh" \
+    --set volume icon.color=$BAR_ORANGE script="$PLUGINS/volume.sh" \
     --subscribe volume volume_change mouse.clicked mouse.scrolled
 popup volume
-popup_title volume 󰕾 $ORANGE
+popup_title volume 󰕾 $BAR_ORANGE
 sketchybar --add slider volume.slider popup.volume $((POPUP_WIDTH - 28)) \
     --set volume.slider padding_left=14 icon.drawing=off label.drawing=off \
         slider.highlight_color=$ORANGE slider.background.height=6 slider.background.corner_radius=3 \
@@ -195,9 +195,9 @@ popup_hint volume "单击图标静音 · 滚轮调节 · 拖动滑块"
 
 # ---- 输入法（label 由 bar-stats 推送）----
 sketchybar --add item input right \
-    --set input icon=󰌌 icon.color=$YELLOW label=EN script="$PLUGINS/hover.sh"
+    --set input icon=󰌌 icon.color=$BAR_YELLOW label=EN script="$PLUGINS/hover.sh"
 popup input
-popup_title input 󰌌 $YELLOW 输入法
+popup_title input 󰌌 $BAR_YELLOW 输入法
 for i in 0 1 2 3 4; do
     sketchybar --add item input.src.$i popup.input \
         --set input.src.$i width=$POPUP_WIDTH drawing=off icon.padding_left=14 icon.padding_right=8 \
@@ -220,63 +220,66 @@ for part in tx rx; do
 done
 sketchybar --set net.rx icon.padding_left=$LABEL_GAP   # 类型图标和 ↓ 之间和别的项图标、数字之间一样宽
 sketchybar --add item net right \
-    --set net padding_left=$ITEM_GAP padding_right=0 icon=󰖟 icon.color=$CYAN label.drawing=off \
+    --set net padding_left=$ITEM_GAP padding_right=0 icon=󰖟 icon.color=$BAR_CYAN label.drawing=off \
         script="$PLUGINS/hover.sh"
 popup net mouse.entered mouse.clicked
 sketchybar --set net popup.align=left   # 面板从这组的左边往右展开，盖住类型图标和两个数字
-popup_title net 󰖟 $CYAN
+popup_title net 󰖟 $BAR_CYAN
 popup_rows net down=下载 up=上传 "ip=IP 地址" router=路由器 signal=信号 rate=连接速率 channel=信道
 popup_hint net "点击打开网络设置"
 
 # ---- 磁盘 ----
 sketchybar --add item disk right \
-    --set disk icon=󰋊 icon.color=$ORANGE label.color=$ORANGE label.width=$PERCENT_WIDTH \
+    --set disk icon=󰋊 icon.color=$BAR_ORANGE label.color=$BAR_ORANGE label.width=$PERCENT_WIDTH \
         script="$PLUGINS/hover.sh"
 popup disk
-popup_title disk 󰋊 $ORANGE
+popup_title disk 󰋊 $BAR_ORANGE
 popup_bar disk bar
 popup_rows disk used=已用 free=可用 purgeable=其中可清除 total=总容量 read=读取 write=写入
 popup_hint disk "点击打开储存空间设置"
 
 # ---- 内存 ----
 sketchybar --add item mem right \
-    --set mem icon=󰍛 icon.color=$GREEN label.color=$GREEN label.width=$PERCENT_WIDTH \
+    --set mem icon=󰍛 icon.color=$BAR_GREEN label.color=$BAR_GREEN label.width=$PERCENT_WIDTH \
         script="$PLUGINS/hover.sh"
 popup mem
-popup_title mem 󰍛 $GREEN
+popup_title mem 󰍛 $BAR_GREEN
 popup_bar mem bar
 popup_rows mem used=已使用 "app=App 内存" wired=联动内存 compressed=被压缩 cached=缓存文件 swap=交换 pressure=内存压力
 popup_top mem
 popup_hint mem "点击打开活动监视器"
 
-# ---- CPU：曲线画在 background 里，SketchyBar 把它的底边贴在栏的下沿附近：
+# ---- CPU、GPU 都是 图标 + 曲线 + 百分比。曲线画在 background 里，SketchyBar 把它的底边贴在栏的下沿附近：
 #      整个项上移 2、图标和文字再下移 2，曲线就和文字居中对齐了
-#      （栏高 24、曲线高 16、底边离栏底约 2：(24 - 16) / 2 - 2 = 2；栏高 32 时是 6） ----
-sketchybar --add graph cpu right 48 \
-    --set cpu icon=󰻠 icon.color=$BLUE label.color=$BLUE label.width=$PERCENT_WIDTH \
-        graph.color=$BLUE graph.fill_color=$BLUE_FILL graph.line_width=1.0 \
-        background.height=16 y_offset=2 icon.y_offset=-2 label.y_offset=-2 \
-        script="$PLUGINS/hover.sh"
+#      （栏高 24、曲线高 16、底边离栏底约 2：(24 - 16) / 2 - 2 = 2；栏高 32 时是 6）。
+#      弹出面板里的详细曲线两个都是蓝色。栏上的曲线 GRAPH_WIDTH 个点（每 2 秒一个，24 个点约 50 秒）----
+GRAPH_WIDTH=24
+graph_item() { # <项> <图标> <颜色> <填充色>
+    sketchybar --add graph "$1" right $GRAPH_WIDTH \
+        --set "$1" icon="$2" icon.color="$3" label.color="$3" label.width=$PERCENT_WIDTH \
+            graph.color="$3" graph.fill_color="$4" graph.line_width=1.0 \
+            background.height=16 y_offset=2 icon.y_offset=-2 label.y_offset=-2 \
+            script="$PLUGINS/hover.sh"
+}
+graph_item cpu 󰻠 $BAR_BLUE $BAR_BLUE_FILL
 popup cpu
-popup_title cpu 󰻠 $BLUE
+popup_title cpu 󰻠 $BAR_BLUE
 popup_graph cpu history $BLUE $BLUE_FILL
 popup_rows cpu user=用户 system=系统 idle=空闲 load=平均负载 uptime=已开机
 popup_top cpu
 popup_hint cpu "点击打开活动监视器"
 
 # ---- GPU ----
-sketchybar --add item gpu right \
-    --set gpu icon=󰾲 icon.color=$PURPLE label.color=$PURPLE label.width=$PERCENT_WIDTH \
-        script="$PLUGINS/hover.sh"
+graph_item gpu 󰾲 $BAR_PURPLE $BAR_PURPLE_FILL
 popup gpu
-popup_title gpu 󰾲 $PURPLE
-popup_graph gpu history $PURPLE $PURPLE_FILL
+popup_title gpu 󰾲 $BAR_PURPLE
+popup_graph gpu history $BLUE $BLUE_FILL
 popup_rows gpu util=利用率 render=渲染 tiler=几何处理 mem=占用内存 alloc=已分配内存
 popup_hint gpu "点击打开活动监视器"
 
 # ---- 主题开关（右边一组的最左边，所以最后加）：调色板图标，彩色主题是紫色、黑白主题是白色；点一下切换（plugins/theme.sh）----
 sketchybar --add item theme right \
-    --set theme icon=󰏘 icon.color=$PURPLE label.drawing=off script="$PLUGINS/theme.sh" \
+    --set theme icon=󰏘 icon.color=$BAR_PURPLE label.drawing=off script="$PLUGINS/theme.sh" \
     --subscribe theme mouse.clicked
 
 # 右边各项统一间距（见 LABEL_GAP / ITEM_GAP；弹出面板里的行不受影响）
@@ -285,6 +288,16 @@ for item in theme clock battery volume input disk mem cpu gpu; do   # 网速那�
     spacing+=(--set $item padding_left=$ITEM_GAP padding_right=$ITEM_GAP label.padding_left=$LABEL_GAP)
 done
 sketchybar "${spacing[@]}"
+
+# 弹出面板里点哪儿都和点栏上的项一样：打开对应的应用或设置页（hover.sh 按行名前面的项名处理）。
+# 音量的面板不算：单击音量是静音，面板里有自己的滑块
+clicks=()
+for item in gpu cpu mem disk net input battery clock; do
+    for row in $(sketchybar --query "$item" | jq -r '.popup.items[]'); do
+        clicks+=(--set "$row" script="$PLUGINS/hover.sh" --subscribe "$row" mouse.clicked)
+    done
+done
+sketchybar "${clicks[@]}"
 
 # ================================================================ 数据推送
 
