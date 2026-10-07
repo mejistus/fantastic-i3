@@ -16,12 +16,12 @@ fi
 level=$(( (percent + 5) / 10 ))   # 0-10
 if grep -q "AC Power" <<<"$info"; then
     icons=(󰢜 󰢜 󰂆 󰂇 󰂈 󰢝 󰂉 󰢞 󰂊 󰂋 󰂅)
-    color=$GREEN
+    color=$BAR_GREEN
 else
     icons=(󰂎 󰁺 󰁻 󰁼 󰁽 󰁾 󰁿 󰂀 󰂁 󰂂 󰁹)
     if [ "$percent" -lt 20 ]; then color=$ALERT
     elif [ "$percent" -lt 40 ]; then color=$WARN
-    else color=$GREEN
+    else color=$BAR_GREEN
     fi
 fi
 sketchybar --set "$NAME" drawing=on icon="${icons[level]}" icon.color="$color" label="${percent}%"
