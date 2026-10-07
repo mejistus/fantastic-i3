@@ -80,8 +80,7 @@ yabai -m config mouse_action2         resize
 yabai -m config mouse_drop_action     swap
 
 # ---- 工作区（10 个桌面始终存在）----
-# 开机登录时 yabai 刚启动的几秒里查询会返回残缺的 JSON：先等它能正常回答，最多 5 秒。
-# 否则下面的规则会因为"查不到桌面"而被登记成不带工作区的（应用不再自动去自己的工作区）。
+# 开机登录时 yabai 刚启动的几秒里查询会返回残缺的 JSON：先等它能正常回答（最多 5 秒）再补齐桌面。
 for _ in $(seq 50); do
     yabai -m query --spaces 2>/dev/null | jq -e 'length > 0' >/dev/null 2>&1 && break
     sleep 0.1
@@ -91,6 +90,7 @@ done
 # ---- [[on-window-detected]] ----
 # rule <工作区|-> <条件 与 属性…>
 #   layout floating → manage=off    layout tiling → manage=on    move-node-to-workspace X → 第一个参数 X
+#   现在都是 -：程序启动后留在当前工作区，不再自动挪到固定的工作区（想恢复某个就把 - 改回工作区号）
 # center <条件…>
 #   exec-and-forget center-window → 浮动窗口出现时居中
 #
@@ -129,37 +129,37 @@ rule - app='^(Stats|BetterDisplay|Mos|Raycast|Dropover|Snipaste|iShot|iBar|AltTa
 rule - app='^(超級右鍵|超级右键|iRightMouse)' manage=off
 
 # 以下顺序与 aerospace.toml 相同
-rule 6 app='^(Microsoft Outlook|Outlook)$' manage=off
+rule - app='^(Microsoft Outlook|Outlook)$' manage=off
 center app='^(Microsoft Outlook|Outlook)$'
-rule 6 app='^(百度网盘|百度網盤|BaiduNetdisk.*)$' manage=off                 # com.baidu.netdisk / BaiduNetdisk-mac
+rule - app='^(百度网盘|百度網盤|BaiduNetdisk.*)$' manage=off                 # com.baidu.netdisk / BaiduNetdisk-mac
 rule - app='^([Hh]armony[Oo][Ss]|鸿蒙|鴻蒙)' manage=off                      # com.HarmonyOSInterconnection.app
 rule - app='^Google Chrome$' manage=off
 rule - app='^(Cherry Studio|CherryStudio)$' manage=off
 center app='^(Cherry Studio|CherryStudio)$'
 # 微信：所有窗口都去工作区 10，主窗口平铺，其他窗口（聊天小窗、图片、朋友圈…）浮动。
 # 按应用名分配工作区，不按标题：主窗口刚出现时标题可能还是空的，规则只在窗口出现的那一刻匹配一次。
-rule 10 app='^(WeChat|微信)$'
+rule - app='^(WeChat|微信)$'
 rule - app='^(WeChat|微信)$' title!='^(微信|WeChat)?$' manage=off
 yabai -m signal --add event=window_created app='^(WeChat|微信)$' action="$AERO float-fixed \$YABAI_WINDOW_ID"  # 扫码登录窗口也叫"微信"，但不能调整大小
-rule 3 app='^Microsoft PowerPoint$' manage=off
-rule 1 app='^Microsoft Word$' manage=off
-rule 2 app='^Microsoft Excel$'                                               # 平铺（以前是浮动）
-rule 9 app='^(TencentMeeting|腾讯会议|騰訊會議)$' manage=off
+rule - app='^Microsoft PowerPoint$' manage=off
+rule - app='^Microsoft Word$' manage=off
+rule - app='^Microsoft Excel$'                                               # 平铺（以前是浮动）
+rule - app='^(TencentMeeting|腾讯会议|騰訊會議)$' manage=off
 rule - app='^QQ$' manage=off
 rule - app='^Finder$' manage=off
 rule - app='^(闪电说|閃電說)' manage=off                                    # cn.shandianshuo.desktop
 rule - app='^Clash Verge' manage=off
-rule 5 app='^kitty$' manage=off
+rule - app='^kitty$' manage=off
 center app='^kitty$'
-rule 5 app='^iTerm2$' "$TILE" manage=on
-rule 6 app='^(哔哩哔哩|嗶哩嗶哩|bilibili)$' manage=off
-rule 6 app='^(QQMusic|QQ音乐|QQ音樂)$' manage=off
-rule 7 app='^Claude$' "$TILE" manage=on
-rule 7 app='^Google Gemini' manage=off
-rule 7 app='^ChatGPT$' "$TILE" manage=on
+rule - app='^iTerm2$' "$TILE" manage=on
+rule - app='^(哔哩哔哩|嗶哩嗶哩|bilibili)$' manage=off
+rule - app='^(QQMusic|QQ音乐|QQ音樂)$' manage=off
+rule - app='^Claude$' "$TILE" manage=on
+rule - app='^Google Gemini' manage=off
+rule - app='^ChatGPT$' "$TILE" manage=on
 rule - app='^Cursor$' "$TILE" manage=on
 rule - app='^(Code|Visual Studio Code)$' "$TILE" manage=on
-rule 7 app='^(TRAE|Trae|Trae CN)$' "$TILE" manage=on
+rule - app='^(TRAE|Trae|Trae CN)$' "$TILE" manage=on
 rule - app='^(小红书|X)$' "$TILE" manage=on
 rule - app='^知乎$' "$TILE" manage=on
 rule - app='^(Calendar|行事曆|日历)$' manage=off
@@ -170,22 +170,22 @@ rule - app='^Photo Booth$' manage=off
 rule - app='^App Store$' manage=off
 rule - title='^(Figure*)' app!="$TAKEN" manage=off
 rule - title='^(python*)' app!="$TAKEN" manage=off
-rule 5 app='^(Terminal|終端機|终端)$' manage=off
-rule 8 app='^(Notes|備忘錄|备忘录)$' manage=off
-rule 8 app='^Typora$' manage=off
-rule 8 app='^Obsidian$' manage=off
-rule 8 app='^Notion$' manage=off
-rule 8 app='^Zotero$' manage=off   # aerospace.toml 里 Zotero 主窗口平铺的那条排在这条后面，从未生效，这里保持一致
-rule 6 app='^(Douyin|抖音)$' manage=off
-rule 6 app='^Spotify$' manage=off
-rule 6 app='^(Music|音樂|音乐)$' manage=off
+rule - app='^(Terminal|終端機|终端)$' manage=off
+rule - app='^(Notes|備忘錄|备忘录)$' manage=off
+rule - app='^Typora$' manage=off
+rule - app='^Obsidian$' manage=off
+rule - app='^Notion$' manage=off
+rule - app='^Zotero$' manage=off   # aerospace.toml 里 Zotero 主窗口平铺的那条排在这条后面，从未生效，这里保持一致
+rule - app='^(Douyin|抖音)$' manage=off
+rule - app='^Spotify$' manage=off
+rule - app='^(Music|音樂|音乐)$' manage=off
 rule - app='^(Safari|Safari浏览器)$' manage=off
 rule - app='^Microsoft Edge$' manage=off
 rule - app='^Arc$' manage=off
 rule - app='^Brave Browser$' manage=off
 rule - app='^Firefox$' manage=off
 rule - title='(Hugging Face|ModelScope|魔搭)' app!="$TAKEN" manage=off
-rule 10 app='^(System Settings|系統設定|系统设置)$' manage=off
+rule - app='^(System Settings|系統設定|系统设置)$' manage=off
 
 # 开机后 5 分钟内启动时，对已经打开的窗口也执行一遍规则：登录时恢复的窗口常常全挤在一个桌面上。
 # 其他时候（手动重启 yabai、aero reload）不执行，不把你手动挪过的窗口拉回规则指定的工作区
