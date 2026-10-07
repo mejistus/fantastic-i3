@@ -18,6 +18,11 @@ if [ "$NAME" = apple ]; then
     if [ "$(sketchybar --query apple | jq -r .popup.drawing)" = on ]; then
         close
     else
+        # SketchyBar 只在有焦点的那块屏上画面板：点的是别的屏上的 ，先把焦点切过去
+        if [ "$(yabai -m query --displays --display mouse 2>/dev/null)" != "$(yabai -m query --displays --display 2>/dev/null)" ]; then
+            yabai -m display --focus mouse 2>/dev/null
+            sleep 0.3
+        fi
         args=()
         for item in $POPUPS; do args+=(--set "$item" popup.drawing=off); done
         mkdir -p "$STATE" && echo apple >"$STATE/bar-hover"

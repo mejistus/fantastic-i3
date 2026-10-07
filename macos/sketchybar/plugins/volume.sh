@@ -1,12 +1,8 @@
 #!/bin/bash
-# 音量：单击静音 / 取消静音，滚轮每格调 5。输出设备不支持调音量（如显示器的 DP / HDMI 音频）时显示 --。
-# 鼠标悬停：交给 hover.sh 打开 / 收起弹出面板
+# 音量：滚轮每格调 5；单击打开 / 收起面板（交给 hover.sh，静音在面板里点）。
+# 输出设备不支持调音量（如显示器的 DP / HDMI 音频）时显示 --。
 case "$SENDER" in
-    mouse.entered | mouse.exited.global) exec "$CONFIG_DIR/plugins/hover.sh" ;;
-esac
-case "$SENDER" in
-    mouse.clicked)
-        osascript -e 'set volume output muted (not (output muted of (get volume settings)))' ;;
+    mouse.clicked) exec "$CONFIG_DIR/plugins/hover.sh" ;;
     mouse.scrolled)
         # Mos 的平滑滚动把滚轮一格拆成一串细小的滚动事件（有的位移为 0）：
         # 位移为 0 的不管，0.25 秒内只调一次，一格只算一格

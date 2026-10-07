@@ -1,8 +1,8 @@
 #!/bin/bash
 # 电池：图标随电量变，接着电源时换成充电图标；低于 20% 变红、40% 变黄（黑白主题也是）。没有电池（台式机）就不显示。
-# 鼠标悬停、点击：交给 hover.sh
+# 点击：交给 hover.sh（打开 / 收起面板）
 case "$SENDER" in
-    mouse.entered | mouse.exited.global | mouse.clicked) exec "$CONFIG_DIR/plugins/hover.sh" ;;
+    mouse.clicked) exec "$CONFIG_DIR/plugins/hover.sh" ;;
 esac
 source "$CONFIG_DIR/colors.sh"
 
