@@ -3,7 +3,7 @@
 # 链接到 ~/.config/sketchybar。高 32、One Dark 配色、Maple Mono NF 字体，和 i3 那边一致。
 #
 #   左：工作区 1-10（数字 + 上面窗口的应用图标；当前的高亮，点一下切过去）、skhd 模式、当前应用和窗口标题
-#   右：GPU（利用率 + 占用的内存）、CPU（曲线）、内存、磁盘、网速、输入法、音量、电池、日期时间、主题开关
+#   右：主题开关、GPU（利用率 + 占用的内存）、CPU（曲线）、内存、磁盘、网速、输入法、音量、电池、日期时间
 #
 # GPU / CPU / 内存 / 磁盘 / 网速 / 输入法由 aero-helper bar-stats 推送（../yabai/helper/main.swift）；
 # 窗口标题、skhd 模式由 yabairc / skhdrc 触发事件。应用图标用 sketchybar-app-font（icon_map.sh）。
@@ -75,7 +75,7 @@ sketchybar --add item front_app left \
     --set window_title icon.drawing=off label.font="$TEXT_FONT:$REGULAR:13.0" label.color=$FG_ALT label.max_chars=80
 
 # ================================================================ 右（先加的在最右边）
-# 系统一组从左到右：GPU、CPU、内存、磁盘，然后是网速、输入法、音量、电池、日期时间，最右边是主题开关（彩色 / 黑白）。
+# 从左到右：主题开关（彩色 / 黑白），系统一组 GPU、CPU、内存、磁盘，然后是网速、输入法、音量、电池、日期时间。
 # 鼠标移上去弹出详情面板（plugins/hover.sh 打开；内容由 aero-helper bar-stats 推送，鼠标离开后也由它收起，
 # 见 ../yabai/helper/bar.swift）。点击由 hover.sh 打开对应的应用或设置页。系统一组的文字和图标同色。
 
@@ -158,12 +158,6 @@ popup_hint() { # <项> <文字>：最下面一行灰色的操作提示
         --set "$1.hint" width=$POPUP_WIDTH icon.drawing=off label="$2" label.font="$TEXT_FONT:$REGULAR:11.0" \
             label.color=$FG_DIM label.padding_left=14
 }
-
-# ---- 主题开关：彩色时是调色板，黑白时是半实心圆；点一下切换（plugins/theme.sh）----
-[ "$THEME" = mono ] && theme_icon=󱎕 || theme_icon=󰏘
-sketchybar --add item theme right \
-    --set theme icon=$theme_icon icon.color=$PURPLE label.drawing=off script="$PLUGINS/theme.sh" \
-    --subscribe theme mouse.clicked
 
 # ---- 日期时间 ----
 sketchybar --add item clock right \
@@ -279,6 +273,11 @@ popup_title gpu 󰾲 $PURPLE
 popup_graph gpu history $PURPLE $PURPLE_FILL
 popup_rows gpu util=利用率 render=渲染 tiler=几何处理 mem=占用内存 alloc=已分配内存
 popup_hint gpu "点击打开活动监视器"
+
+# ---- 主题开关（右边一组的最左边，所以最后加）：调色板图标，彩色主题是紫色、黑白主题是白色；点一下切换（plugins/theme.sh）----
+sketchybar --add item theme right \
+    --set theme icon=󰏘 icon.color=$PURPLE label.drawing=off script="$PLUGINS/theme.sh" \
+    --subscribe theme mouse.clicked
 
 # 右边各项统一间距（见 LABEL_GAP / ITEM_GAP；弹出面板里的行不受影响）
 spacing=()
