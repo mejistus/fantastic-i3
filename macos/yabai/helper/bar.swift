@@ -453,13 +453,13 @@ final class BarStats {
         lastCPU = ticksNow
         let cpuPercent = 100 - cpu.idle
         args += ["--push", "cpu", String(format: "%.3f", cpuPercent / 100), "--push", "cpu.history", String(format: "%.3f", cpuPercent / 100),
-                 "--set", "cpu", String(format: "label=%2.0f%%", cpuPercent)]
+                 "--set", "cpu", percentLabel(cpuPercent)]
 
         let memPercent = memoryInfo().used / memoryTotal * 100
-        args += ["--set", "mem", String(format: "label=%2.0f%%", memPercent)]
+        args += ["--set", "mem", percentLabel(memPercent)]
 
         if let gpu = gpuInfo() {
-            args += ["--set", "gpu", String(format: "label=%2d%%", gpu.utilization),
+            args += ["--set", "gpu", percentLabel(Double(gpu.utilization)),
                      "--push", "gpu.history", String(format: "%.3f", Double(gpu.utilization) / 100)]
         }
 
@@ -472,12 +472,20 @@ final class BarStats {
         lastDiskIO = (io, now)
         if ticks % 15 == 0, let disk = diskInfo() {
             let used = disk.used / disk.total * 100
-            args += ["--set", "disk", String(format: "label=%2.0f%%", used)]
+            args += ["--set", "disk", percentLabel(used)]
         }
         ticks += 1
 
         if let item = hovered() { args += details(item) }
         send(args)
+    }
+
+    /// 栏上的百分比。不补空格：SketchyBar 按字形轮廓算文字宽度，开头的空格不算宽度却照样画出来，
+    /// 文字会往右挤进下一项。宽度由 sketchybarrc 里固定的 label.width 管（左对齐，数字贴着图标）。
+    /// 满载写 "100" 不带 %：和 "99%" 一样宽，固定宽度只要容下两位数，平时图标和数字之间不留空
+    func percentLabel(_ percent: Double) -> String {
+        let value = Int(min(max(percent, 0), 100).rounded())
+        return value == 100 ? "label=100" : "label=\(value)%"
     }
 
     /// 栏上的网络：主网卡（默认路由所在的）类型图标和上下行速度
@@ -502,7 +510,8 @@ final class BarStats {
         return ["icon=\(icon)", "label=\(downArrow)\(rate(down)) \(upArrow)\(rate(up))"]
     }
 
-    /// 栏上的速度，固定 5 个字符宽（等宽字体下不会跳）：" 999B" "12.3K" " 456K" " 1.2M"
+    /// 栏上的速度，数字贴着箭头，后面补空格到 5 个字符（等宽字体下 ↑ 的位置不跳）："999B " "12.3K" "456K " "1.2M "。
+    /// 行尾的空格不算宽度，整行宽度由 sketchybarrc 里固定的 label.width 管
     func rate(_ bytesPerSecond: Double) -> String {
         let text: String
         switch bytesPerSecond {
@@ -512,7 +521,7 @@ final class BarStats {
         case ..<10_000_000: text = String(format: "%.1fM", bytesPerSecond / 1_000_000)
         default: text = "\(Int(bytesPerSecond / 1_000_000))M"
         }
-        return String(repeating: " ", count: max(0, 5 - text.count)) + text
+        return text + String(repeating: " ", count: max(0, 5 - text.count))
     }
 
     // MARK: 弹出面板
