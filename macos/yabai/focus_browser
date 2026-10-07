@@ -1,0 +1,30 @@
+#!/bin/bash
+# ⌥G：去工作区 1 用默认浏览器（系统设置里的默认浏览器，现在是 Edge）。
+#   工作区 1 上有它的窗口：切到工作区 1 并聚焦这个窗口（有好几个就用最近用过的）；
+#   没有：切到工作区 1，在那里新开一个浏览器窗口（浏览器在别的工作区的窗口不动）。
+export PATH=/opt/homebrew/bin:/usr/bin:/bin
+AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+WORKSPACE=1
+
+IFS=$'\t' read -r bundle pids < <("$AERO" helper default-browser)
+bundle=${bundle:-com.apple.Safari}
+
+# 工作区 1 上这个浏览器的窗口，按最近使用排序取第一个
+mru=$(jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' "/tmp/yabai-aero-$USER/mru" 2>/dev/null || echo '[]')
+win=$(yabai -m query --windows --space "$WORKSPACE" 2>/dev/null | jq -r --arg pids " $pids " --argjson mru "$mru" '
+    [.[] | select((" \(.pid) " | inside($pids)) and (."is-minimized" | not))]
+    | sort_by(.id as $i | $mru | index($i) // 1e6) | first | .id // empty')
+
+if [ -n "$win" ]; then
+    "$AERO" focus-window "$win"
+    exit 0
+fi
+
+"$AERO" workspace "$WORKSPACE"
+case $bundle in
+    com.apple.[Ss]afari)
+        osascript -e 'tell application id "com.apple.Safari" to make new document' \
+                  -e 'tell application id "com.apple.Safari" to activate' ;;
+    *)  # Edge / Chrome / Firefox 等：--new-window 交给已经在运行的那个进程，在当前桌面开新窗口
+        open -n -b "$bundle" --args --new-window ;;
+esac

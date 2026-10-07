@@ -55,7 +55,7 @@ git clone https://github.com/mejistus/fantastic-i3 ~/Documents/fantastic-i3
 bash ~/Documents/fantastic-i3/macos/install.sh
 ```
 
-The script is safe to rerun. It installs yabai, skhd and jq with Homebrew, links the configs into `~/.config` and builds the window switcher. It also turns off "Automatically rearrange Spaces based on most recent use" and starts both services. At the end it lists what's left to do by hand:
+The script is safe to rerun. It installs yabai, skhd, SketchyBar, jq and the fonts with Homebrew, links the configs into `~/.config` and builds the window switcher. It also turns off "Automatically rearrange Spaces based on most recent use", sets the macOS menu bar to auto-hide and starts the services. At the end it lists what's left to do by hand:
 
 - Give yabai and skhd Accessibility access (System Settings → Privacy & Security → Accessibility), then rerun the script.
 - Add desktops in Mission Control until there are 10.
@@ -65,17 +65,25 @@ The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somew
 | Key | Action |
 |---|---|
 | ⌥1 … ⌥9, ⌥0 | Go to workspace 1 … 10 |
+| ⌥B / ⌥T / ⌥Z / ⌥C, ⌥ + Caps Lock | Aliases for workspace 4 / 5 / 8 / 9, and 10. Caps Lock works on keyboards where it's remapped to 🌐/fn or left as Caps Lock |
 | ⌥⇧1 … ⌥⇧0 | Move the window to that workspace and follow it |
 | ⌃H / ⌃L | Previous / next workspace |
 | ⌥H/J/K/L, ⌥⇧H/J/K/L | Focus / swap left, down, up, right |
-| ⌥ or ⌘ + arrow, ⌘⇧ + arrow | Focus / swap by arrow keys. The ⌘ versions replace the system's move/select-to-line/document-edge shortcuts and browser back/forward |
+| ⌥ + arrow, ⌥⇧ + arrow | Focus / swap by arrow keys. These replace the system's move/select-by-word shortcuts |
 | ⌥F / ⌥⇧F | Fullscreen / toggle floating |
 | ⌥- / ⌥= | Shrink / grow the window |
-| ⌘⇥ | Tap: previous window. Hold ⌘: window list, which switches to the English keyboard layout so you can type to search. Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
+| ⌥⇥ | Tap: previous window. Hold ⌥: window list, which switches to the English keyboard layout so you can type to search. Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
 | ⌥R / ⌃S | Resize mode / service mode |
 | ⌥D | Bring a Finder window to this workspace, or open one |
-| ⌥G | Jump to Safari, or open a window |
+| ⌥G | Default browser on workspace 1: focus its window there, or switch to workspace 1 and open a new window |
 | ⌥⇧⇥ | Move the workspace to the next monitor (needs the scripting addition) |
+
+The macOS menu bar is replaced by a SketchyBar top bar styled like the i3 polybar (32 px, One Dark, Maple Mono NF). Move the mouse to the top edge to reach the real menu bar.
+
+- Left: workspaces 1 … 10 with the icons of the apps on each (click to switch), the skhd mode (RESIZE / SERVICE) and the focused app and window title.
+- Right: system stats in the order GPU (Apple Silicon/MPS utilization), CPU graph, memory, disk (used, counted like Finder), then network speed, input method (中/EN), volume (click to mute, scroll to change), battery and date/time (formatted for the system locale, e.g. 10月7日 週三 13:55). Hover over any item on the right for a detail panel. GPU and CPU show a history graph; memory and disk show a usage bar and breakdown; CPU and memory list the top 5 processes (computed only while the panel is open); network shows IP, router and Wi-Fi signal/rate/channel; volume has a draggable slider for the current output device; battery shows health, cycles and temperature; the clock shows the lunar date and week number. Clicking an item opens the matching app or settings page. The bar sits above ordinary windows, so floating windows at the top of the screen can't cover it.
+
+Config is in `macos/sketchybar/`. GPU, CPU, memory, disk, network, input method and the panel contents come from `aero-helper bar-stats` (`macos/yabai/helper/bar.swift`). macOS 15 hides the Wi-Fi name from apps without Location access, so the network item shows the connection type instead.
 
 Without the scripting addition, workspaces switch with macOS's slide animation. Instant switching needs yabai's scripting addition, which requires partly disabling SIP. In Recovery, run `csrutil enable --without fs --without debug --without nvram`. Then run `macos/yabai/setup-sa`, and reboot if it asks. Run `setup-sa` again after every yabai upgrade. On macOS 15 it also patches yabai's loader so it can inject into the Dock ([yabai#2686](https://github.com/asmvik/yabai/issues/2686)).
 
