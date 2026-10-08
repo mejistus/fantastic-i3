@@ -24,6 +24,7 @@ pkill -f "^$HELPER bar-backdrop" 2>/dev/null
 
 # topmost=window：栏在普通窗口之上（菜单、系统菜单栏之下）。默认的 off 会把栏放在普通窗口下面，
 # 不归 yabai 平铺的浮动窗口（闪电说、QQ 音乐、微信、访达……）放在屏幕顶上时会盖住栏的一部分。
+# 有窗口盖满整块屏时（PowerPoint 放映等），bar-backdrop 临时改成 off，让它盖住栏，之后再改回 window。
 # 高度和系统菜单栏一样（没有刘海的屏幕上是 24）：自动隐藏的菜单栏滑下来时正好盖住这条栏。
 # 改高度时 ../yabai/yabairc 的 external_bar 跟着改。
 # 底色不用 SketchyBar 的 blur_radius（macOS 15 上没效果），而是栏下面垫一条底板（aero-helper bar-backdrop，
