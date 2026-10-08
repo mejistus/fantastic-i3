@@ -23,6 +23,8 @@
 //       按系统的语言和地区格式化当前时间（DateFormatter 模板，如 MMMdEEEHm → 10月7日 週三 13:55）。
 //   aero-helper input-source
 //       打印当前输入法的简称：中文 → 中，日文 → あ，韩文 → 한，英文键盘布局 → EN。
+//   aero-helper ordered-out <窗口id>...
+//       打印其中被应用收起来、哪个桌面上都看不到的窗口（见"收起来的窗口"）。SketchyBar 的工作区图标用。
 //   aero-helper bar-stats [秒]
 //       给 SketchyBar 送数据（常驻，由 sketchybarrc 启动）：每隔几秒（默认 2）推一次 CPU、内存、
 //       GPU（利用率和占用的内存）、网速，磁盘每 30 秒一次；切换输入法时立刻推输入法。SketchyBar 不在了就退出。
@@ -91,6 +93,23 @@ func CGSSetSymbolicHotKeyEnabled(_ hotKey: Int32, _ isEnabled: Bool) -> CGError
 
 func setNativeCommandTab(_ enabled: Bool) {
     for hotKey: Int32 in [1, 2] { _ = CGSSetSymbolicHotKeyEnabled(hotKey, enabled) }
+}
+
+// MARK: - 收起来的窗口
+
+// 应用关掉主窗口但还在后台时（腾讯会议、微信），窗口常常只是被收起来（orderOut）：窗口服务器里还在，yabai 也还把它
+// 算在原来的桌面上，只是没有 AX 引用——和 yabai 刚启动时别的桌面上还没拿到细节的真窗口一样。"摆没摆出来"才分得清。
+@_silgen_name("CGSMainConnectionID")
+func CGSMainConnectionID() -> Int32
+@_silgen_name("CGSWindowIsOrderedIn")
+func CGSWindowIsOrderedIn(_ cid: Int32, _ wid: UInt32, _ orderedIn: UnsafeMutablePointer<DarwinBoolean>) -> CGError
+
+func orderedOut(_ ids: [UInt32]) -> [UInt32] {
+    let cid = CGSMainConnectionID()
+    return ids.filter { id in
+        var orderedIn: DarwinBoolean = false
+        return CGSWindowIsOrderedIn(cid, id, &orderedIn) == .success && !orderedIn.boolValue
+    }
 }
 
 // MARK: - 输入法
@@ -534,6 +553,8 @@ case "date":
     print(formatter.string(from: Date()))
 case "input-source":
     print(inputSourceLabel())
+case "ordered-out":
+    orderedOut(arguments.dropFirst().compactMap { UInt32($0) }).forEach { print($0) }
 case "bar-stats":
     let stats = BarStats()   // 要留着强引用：定时器和通知的回调用的是 weak self
     stats.run(interval: Double(arguments.dropFirst().first ?? "") ?? 2)
@@ -552,6 +573,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
     exit(2)
 }

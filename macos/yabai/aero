@@ -17,6 +17,7 @@
 #   aero reload                                              = reload-config（不重启 yabai，不打乱窗口）
 #   aero keys <auto|sa|native> [--force]                     桌面快捷键模式（见下）
 #   aero spaces                                              创建 / 标记工作区对应的桌面
+#   aero spaces-changed                                      桌面有增减时 reload（space_created / destroyed 信号调）
 #   aero status                                              查看当前状态
 #   aero log <消息>                                          写一行到 /tmp/yabai-aero-$USER/aero.log（排查用）
 #
@@ -426,6 +427,8 @@ cmd_toggle_space_float() {
 cmd_ensure_focus() {
     local sp pid target _
     sp=$(current_space)
+    # 原生全屏的桌面上只有那一个应用，焦点 macOS 自己管；在这里抢焦点正赶上全屏动画
+    yabai -m query --spaces --space | jq -e '."is-native-fullscreen"' >/dev/null && return 0
     for _ in 1 2 3 4 5 6; do
         sleep 0.1
         [ "$(current_space)" = "$sp" ] || return 0   # 又切走了
@@ -446,10 +449,24 @@ skhd_reload() {
     skhd --reload 2>/dev/null || skhd --restart-service >/dev/null 2>&1
 }
 
+# 同一时间只跑一个：两个一起跑时各自"先清掉、再登记"会交错，信号就登记成了两份，之后每个事件都触发两遍
 cmd_reload() {
+    find "$STATE/reload.lock" -maxdepth 0 -mmin +1 -exec rmdir {} \; 2>/dev/null   # 上次被打断留下的
+    mkdir "$STATE/reload.lock" 2>/dev/null || return 0
     AERO_RELOAD=1 "$HOME/.config/yabai/yabairc" >/dev/null 2>&1
     skhd_reload
+    rmdir "$STATE/reload.lock"
     return 0
+}
+
+# 普通桌面有增减时才 reload（规则里的工作区在登记时才确定）。原生全屏的应用自己占一个桌面，进出全屏也会触发
+# space_created / space_destroyed，那种不算：之前每次全屏都 reload（重新注入 SA、登记规则和信号、重载 skhd），
+# 正赶上全屏动画，又卡又闪
+cmd_spaces_changed() {
+    local desktops
+    desktops=$(yabai -m query --spaces | jq -c '[.[] | select(."is-native-fullscreen" | not) | .id]') || return 0
+    [ "$desktops" = "$(cat "$STATE/desktops" 2>/dev/null)" ] && return 0
+    cmd_reload
 }
 
 set_hotkey() { # <id> <true|false> <ascii> <keycode> <modifiers>
@@ -509,6 +526,8 @@ cmd_spaces() {
         case $label in [0-9]*) ;; *) yabai -m space "$idx" --label "$label" ;; esac
         i=$((i + 1))
     done
+    # 记下现在有哪些普通桌面，spaces-changed 拿来比
+    yabai -m query --spaces | jq -c '[.[] | select(."is-native-fullscreen" | not) | .id]' >"$STATE/desktops"
     return 0
 }
 
@@ -542,6 +561,7 @@ case ${1:-} in
     reload) cmd_reload ;;
     keys) shift; cmd_keys "$@" ;;
     spaces) cmd_spaces ;;
+    spaces-changed) cmd_spaces_changed ;;
     status) cmd_status ;;
-    *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
