@@ -55,9 +55,10 @@ if command -v sketchybar >/dev/null 2>&1; then
     yabai -m signal --add event=window_title_changed action="sketchybar --trigger title_change"
 fi
 
-# 在调度中心里添加 / 删除桌面后，重新登记规则（规则里的工作区在登记时才确定）
-yabai -m signal --add event=space_created action="$AERO reload"
-yabai -m signal --add event=space_destroyed action="$AERO reload"
+# 在调度中心里添加 / 删除桌面后，重新登记规则（规则里的工作区在登记时才确定）。
+# 进出原生全屏也会新建 / 删掉一个桌面，那种不 reload（见 aero spaces-changed）
+yabai -m signal --add event=space_created action="$AERO spaces-changed"
+yabai -m signal --add event=space_destroyed action="$AERO spaces-changed"
 
 # ---- 布局：tiles，横向根容器，间距 2 ----
 yabai -m config layout                bsp
