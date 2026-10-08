@@ -5,14 +5,16 @@
 //       也只松开自己按下的，所以按住 ⌃ 连按 H 也能连续切换。
 //   aero-helper wait-release <shift,option,...> <秒>
 //       等这些修饰键全部松开；超时仍按着则退出码为 1。
-//   aero-helper native-cmd-tab on|off
-//       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器（关掉后 ⌘⇥ 才能交给 skhd）。效果持续到重新登录。
-//       现在窗口切换器用 ⌥⇥，⌘⇥ 保持 macOS 自带的，平时用不到这个命令。
-//   aero-helper switcher [--select 窗口id] [--apps] [--font-size N] [--width 屏幕宽度%] [--rows N]
+//   aero-helper native-hotkeys on|off
+//       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器和 Spotlight 的 ⌘Space（关掉后这几个键才能交给 skhd）。
+//       效果持续到重新登录。yabairc 每次启动都关掉它们：⌘⇥ 和 ⌘Space 是按应用切换的列表（window_switcher --apps）。
+//   aero-helper switcher [--select 窗口id] [--apps | --launchpad] [--font-size N] [--width 屏幕宽度%] [--rows N]
 //       窗口切换列表。从 stdin 读 TSV：窗口id \t 桌面 \t 应用 \t 标题 \t 状态 \t pid
 //       --apps：列表末尾再加上 Dock 里亮着点、但没有窗口的应用（选中时输出 app:pid:bundle id）。
-//       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法。
-//       ↑↓ / ⇥⇧⇥ / ⌥⇥⌥⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
+//       --launchpad：应用列表（stdin 每个应用一行），和 --apps 一样加上没有窗口的应用，最后是启动台里其余的应用，
+//                    按名字排序（选中时输出 app::bundle id，在后台运行的带 pid）。
+//       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法；汉字用拼音搜（全拼或首字母）。
+//       ↑↓ / ⇥⇧⇥ / ⌥⇥⌥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
 //       ⌘+ / ⌘- 调整字号，⌘0 恢复默认；字号会记住。
 //   aero-helper default-browser
 //       打印默认浏览器的 bundle id 和正在运行的进程号：com.microsoft.edgemac<TAB>123 456
@@ -40,6 +42,7 @@
 import AppKit
 import Carbon
 import CoreGraphics
+import SQLite3
 
 // MARK: - 修饰键
 
@@ -85,14 +88,14 @@ func step(_ key: CGKeyCode) {
     if addControl { flags.remove(.maskControl); post(59, false, flags) }
 }
 
-// MARK: - macOS 自带的 ⌘⇥
+// MARK: - macOS 自带的 ⌘⇥ 和 ⌘Space
 
-// 私有 API（AltTab 也是这么做的）：1 = ⌘⇥，2 = ⌘⇧⇥
+// 私有 API（AltTab 也是这么做的）：1 = ⌘⇥，2 = ⌘⇧⇥，64 = Spotlight（默认 ⌘Space）
 @_silgen_name("CGSSetSymbolicHotKeyEnabled")
 func CGSSetSymbolicHotKeyEnabled(_ hotKey: Int32, _ isEnabled: Bool) -> CGError
 
-func setNativeCommandTab(_ enabled: Bool) {
-    for hotKey: Int32 in [1, 2] { _ = CGSSetSymbolicHotKeyEnabled(hotKey, enabled) }
+func setNativeHotkeys(_ enabled: Bool) {
+    for hotKey: Int32 in [1, 2, 64] { _ = CGSSetSymbolicHotKeyEnabled(hotKey, enabled) }
 }
 
 // MARK: - 收起来的窗口
@@ -200,9 +203,62 @@ func windowlessApps(excluding pids: Set<pid_t>) -> [Item] {
             let file = url.deletingPathExtension().lastPathComponent
             let name = app.localizedName ?? file
             return Item(id: "app:\(app.processIdentifier):\(bundle)", desk: "", app: name, title: "", state: "无窗口",
-                        pid: app.processIdentifier, haystack: Array("\(name) \(file)".lowercased()))
+                        pid: app.processIdentifier, path: nil, haystack: searchKeys("\(name) \(file)"))
         }
         .sorted { $0.app.localizedStandardCompare($1.app) == .orderedAscending }
+}
+
+/// 启动台里的应用（名字和启动台里一样），不在 bundles 里的。按名字排序。
+/// 读启动台自己的数据库；读不到（比如 macOS 26 起没有启动台）就扫它收录的那几个文件夹。
+func launchpadApps(excluding bundles: Set<String>) -> [Item] {
+    var apps: [String: (name: String, url: URL)] = [:]
+    for (title, bundle) in launchpadDatabase() {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) { apps[bundle] = (title, url) }
+    }
+    if apps.isEmpty {
+        for folder in ["/System/Applications", "/Applications", NSHomeDirectory() + "/Applications"] {
+            let walker = FileManager.default.enumerator(at: URL(fileURLWithPath: folder), includingPropertiesForKeys: nil,
+                                                        options: [.skipsHiddenFiles, .skipsPackageDescendants])
+            while let link = walker?.nextObject() as? URL {
+                let url = link.resolvingSymlinksInPath()   // /Applications/Safari.app 是个链接
+                guard url.pathExtension == "app", let bundle = Bundle(url: url)?.bundleIdentifier, apps[bundle] == nil else { continue }
+                var name = FileManager.default.displayName(atPath: url.path)
+                if name.hasSuffix(".app") { name.removeLast(4) }
+                apps[bundle] = (name, url)
+            }
+        }
+    }
+    // 不在 Dock 里的应用（菜单栏小工具等）可能在后台开着：不标"未运行"，选中时也不用等它启动
+    let running = Dictionary(NSWorkspace.shared.runningApplications.compactMap { app in
+        app.bundleIdentifier.map { ($0, app.processIdentifier) } }, uniquingKeysWith: { first, _ in first })
+    return apps.filter { !bundles.contains($0.key) }
+        .map { bundle, app in
+            let file = app.url.deletingPathExtension().lastPathComponent
+            let pid = running[bundle]
+            return Item(id: "app:\(pid.map(String.init) ?? ""):\(bundle)", desk: "", app: app.name, title: "",
+                        state: pid == nil ? "未运行" : "", pid: pid ?? 0, path: app.url.path,
+                        haystack: searchKeys("\(app.name) \(file)"))
+        }
+        .sorted { $0.app.localizedStandardCompare($1.app) == .orderedAscending }
+}
+
+/// 启动台的数据库（Dock 维护的 SQLite）里的应用：名字和 bundle id。删掉的应用可能还留在里面
+func launchpadDatabase() -> [(title: String, bundle: String)] {
+    var dir = [CChar](repeating: 0, count: Int(PATH_MAX))
+    guard confstr(_CS_DARWIN_USER_DIR, &dir, dir.count) > 0 else { return [] }
+    var db: OpaquePointer?
+    defer { sqlite3_close(db) }
+    guard sqlite3_open_v2(String(cString: dir) + "com.apple.dock.launchpad/db/db", &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK
+    else { return [] }
+    var query: OpaquePointer?
+    defer { sqlite3_finalize(query) }
+    guard sqlite3_prepare_v2(db, "SELECT title, bundleid FROM apps", -1, &query, nil) == SQLITE_OK else { return [] }
+    var apps: [(String, String)] = []
+    while sqlite3_step(query) == SQLITE_ROW {
+        guard let title = sqlite3_column_text(query, 0), let bundle = sqlite3_column_text(query, 1) else { continue }
+        apps.append((String(cString: title), String(cString: bundle)))
+    }
+    return apps
 }
 
 struct Item {
@@ -212,7 +268,33 @@ struct Item {
     let title: String
     let state: String
     let pid: pid_t
-    let haystack: [Character]
+    let path: String?          // 没在运行的应用：从这里取图标
+    let haystack: [[Character]]   // 搜索用的几种写法（searchKeys），哪种匹配得最好算哪种
+}
+
+/// 搜索用的写法：原文；有汉字的再加上拼音，打 tianqi、tq 都能找到"天氣"。
+/// 按词注音，多音字跟着词走（銀行 yinhang、音樂 yinyue）；分词器只认简体的词，所以繁体先转成简体
+enum Pinyin {
+    static let tokenizer = CFStringTokenizerCreate(nil, "" as CFString, CFRangeMake(0, 0), kCFStringTokenizerUnitWord,
+                                                   Locale(identifier: "zh-Hans") as CFLocale)
+}
+
+func searchKeys(_ text: String) -> [[Character]] {
+    let text = text.lowercased()
+    guard text.unicodeScalars.contains(where: \.properties.isIdeographic) else { return [Array(text)] }
+    let simplified = NSMutableString(string: text)
+    CFStringTransform(simplified, nil, "Hant-Hans" as CFString, false)
+    let tokenizer = Pinyin.tokenizer
+    CFStringTokenizerSetString(tokenizer, simplified, CFRangeMake(0, simplified.length))
+    var words: [String] = []
+    while CFStringTokenizerAdvanceToNextToken(tokenizer) != [] {
+        if let latin = CFStringTokenizerCopyCurrentTokenAttribute(tokenizer, kCFStringTokenizerAttributeLatinTranscription) as? String {
+            words.append(latin)
+        }
+    }
+    let pinyin = NSMutableString(string: words.joined(separator: " "))
+    CFStringTransform(pinyin, nil, kCFStringTransformStripDiacritics, false)
+    return [Array(text), Array((pinyin as String).lowercased())]
 }
 
 final class KeyPanel: NSPanel {
@@ -252,13 +334,15 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
     var widthPercent: CGFloat = 55
     var maxRows = 12
     var includeApps = false
+    var launchpad = false
+    var placeholder = "切换窗口…"
 
     let panel = KeyPanel(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
     let search = NSTextField()
     let divider = NSBox()
     let table = NSTableView()
     let scroll = NSScrollView()
-    var icons: [pid_t: NSImage] = [:]
+    var icons: [String: NSImage] = [:]
     var top: CGFloat?
 
     init(arguments: [String]) {
@@ -269,6 +353,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
             switch arguments[i] {
             case "--select": preselect = value; i += 1
             case "--apps": includeApps = true
+            case "--launchpad": includeApps = true; launchpad = true; placeholder = "切换应用…"
             case "--font-size": initialFont = CGFloat(Double(value) ?? Double(initialFont)); i += 1
             case "--width": widthPercent = CGFloat(Double(value) ?? 55); i += 1
             case "--rows": maxRows = Int(value) ?? 12; i += 1
@@ -285,10 +370,13 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
             guard f.count >= 3 else { continue }
             let field = { (n: Int) in n < f.count ? f[n] : "" }
             all.append(Item(id: f[0], desk: field(1), app: field(2), title: field(3), state: field(4),
-                            pid: pid_t(field(5)) ?? 0,
-                            haystack: Array("\(field(1)) \(field(2)) \(field(3))".lowercased())))
+                            pid: pid_t(field(5)) ?? 0, path: nil,
+                            haystack: searchKeys("\(field(1)) \(field(2)) \(field(3))")))
         }
         if includeApps { all += windowlessApps(excluding: Set(all.map(\.pid))) }
+        if launchpad {
+            all += launchpadApps(excluding: Set(all.compactMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }))
+        }
         shown = all
     }
 
@@ -322,7 +410,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
         search.isBordered = false
         search.drawsBackground = false
         search.focusRingType = .none
-        search.placeholderString = "切换窗口…"
+        search.placeholderString = placeholder
         search.delegate = self
         search.cell?.usesSingleLineMode = true
         search.cell?.lineBreakMode = .byTruncatingTail
@@ -365,7 +453,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
             case 24, 69: self.setFontSize(self.fontSize + 2)                 // ⌘= ⌘+（含小键盘）
             case 27, 78: self.setFontSize(self.fontSize - 2)                 // ⌘-
             case 29, 82: self.setFontSize(Switcher.defaultFontSize, save: false) // ⌘0 恢复默认
-            case 12, 13: exit(1)                                             // ⌘Q ⌘W
+            case 12, 13, 49: exit(1)                                         // ⌘Q ⌘W；⌘Space 再按一下也关掉（和 Spotlight 一样）
             default: return event
             }
             return nil
@@ -390,7 +478,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
     func applyFont() {
         search.font = .systemFont(ofSize: fontSize, weight: .regular)
-        search.placeholderAttributedString = NSAttributedString(string: "切换窗口…", attributes: [
+        search.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [
             .font: NSFont.systemFont(ofSize: fontSize, weight: .light), .foregroundColor: NSColor.tertiaryLabelColor])
         table.rowHeight = ceil(fontSize * 1.7)
         table.reloadData()
@@ -426,7 +514,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
             shown = all.enumerated().compactMap { index, item -> (Int, Int, Item)? in
                 var total = 0
                 for term in terms {
-                    guard let s = fuzzyScore(term, item.haystack) else { return nil }
+                    guard let s = item.haystack.compactMap({ fuzzyScore(term, $0) }).max() else { return nil }
                     total += s
                 }
                 return (total, index, item)
@@ -494,7 +582,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
         let iconSize = floor(rowHeight * 0.74)
         let icon = NSImageView(frame: NSRect(x: desk.frame.maxX + 12, y: (rowHeight - iconSize) / 2, width: iconSize, height: iconSize))
-        icon.image = iconFor(item.pid)
+        icon.image = iconFor(item)
         icon.imageScaling = .scaleProportionallyUpOrDown
         cell.addSubview(icon)
 
@@ -518,10 +606,11 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
         return cell
     }
 
-    func iconFor(_ pid: pid_t) -> NSImage? {
-        if let icon = icons[pid] { return icon }
-        let icon = NSRunningApplication(processIdentifier: pid)?.icon
-        icons[pid] = icon
+    func iconFor(_ item: Item) -> NSImage? {
+        let key = item.path ?? String(item.pid)
+        if let icon = icons[key] { return icon }
+        let icon = item.path.map { NSWorkspace.shared.icon(forFile: $0) } ?? NSRunningApplication(processIdentifier: item.pid)?.icon
+        icons[key] = icon
         return icon
     }
 }
@@ -537,8 +626,8 @@ case "wait-release":
     let mask = modifierMask(rest.first ?? "shift,option")
     let timeout = rest.count > 1 ? Double(rest[1]) ?? 1 : 1
     exit(waitRelease(mask, timeout: timeout) ? 0 : 1)
-case "native-cmd-tab":
-    setNativeCommandTab(arguments.dropFirst().first == "on")
+case "native-hotkeys":
+    setNativeHotkeys(arguments.dropFirst().first == "on")
 case "default-browser":
     guard let browser = defaultBrowser() else { exit(1) }
     print("\(browser.bundle)\t\(browser.pids.map(String.init).joined(separator: " "))")
@@ -573,6 +662,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-cmd-tab on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
     exit(2)
 }

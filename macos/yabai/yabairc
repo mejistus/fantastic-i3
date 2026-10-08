@@ -42,6 +42,10 @@ if [ -z "$AERO_RELOAD" ] || ! pgrep -qf "^$HELPER option-fn"; then
     "$HELPER" option-fn "$AERO workspace 10" >/dev/null 2>&1 &
 fi
 
+# ⌘⇥ 和 ⌘Space 交给 skhd（按应用切换，见 window_switcher --apps）：关掉 macOS 自带的应用切换器和 Spotlight 的快捷键。
+# 重新登录后会恢复，所以每次都关
+"$AERO" helper native-hotkeys off
+
 # 切桌面后 macOS 有时把焦点给 Finder（桌面本身）而不是这个桌面上的窗口：补一下（见 aero ensure-focus）
 yabai -m signal --add event=space_changed action="$AERO ensure-focus"
 
@@ -124,7 +128,7 @@ center() {
 }
 TILE='subrole=^AXStandardWindow$'   # 强制平铺只针对普通窗口，对话框 / 弹窗照常浮动
 
-# 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ 窗口切换列表
+# 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ / ⌘⇥ 切换列表
 rule - app='^(Calculator|計算機|计算器|Archive Utility|封存工具程式|归档实用工具)$' manage=off
 rule - app='^(Stats|BetterDisplay|Mos|Raycast|Dropover|Snipaste|iShot|iBar|AltTab|Wins|choose|aero-helper)$' manage=off
 rule - app='^(超級右鍵|超级右键|iRightMouse)' manage=off

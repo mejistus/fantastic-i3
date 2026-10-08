@@ -55,10 +55,13 @@ alt + shift - 0 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-wor
 # move-workspace-to-monitor --wrap-around next
 alt + shift - tab : $HOME/Documents/fantastic-i3/macos/yabai/aero move-workspace-to-monitor --wrap-around next
 
-# 窗口切换器（⌥⇥；⌘⇥ 还是 macOS 自带的应用切换器）
-#   快速按一下 = 回到上一个用过的窗口；按住 ⌥ = 弹出列表（同时切到英文输入法，打字直接搜索）
-# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：⌥⇥ / ⌥⇧⇥ 在列表里往下 / 往上选，Esc 关闭
+# 窗口切换器（⌥⇥）和应用切换器（⌘⇥，macOS 自带的由 yabairc 关掉；⌘Space 直接弹出它的列表，Spotlight 的快捷键同样关掉）
+#   快速按一下 = 回到上一个用过的窗口 / 应用；按住 ⌥ / ⌘ = 弹出列表（同时切到英文输入法，打字直接搜索）
+#   ⌘⇥ 列的是启动台里的所有应用：有窗口的在最上面，然后是开着但没窗口的，最后是没开的
+# 列表开着时 skhd 不拦截任何键（见下面的 .blacklist）：⌥⇥ / ⌥⇧⇥（⌘⇥ / ⌘⇧⇥）在列表里往下 / 往上选，Esc 关闭
 alt - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --auto
+cmd - tab : $HOME/Documents/fantastic-i3/macos/window_switcher --apps --auto
+cmd - space : $HOME/Documents/fantastic-i3/macos/window_switcher --apps --list
 .blacklist [
     "aero-helper"
 ]

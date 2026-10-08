@@ -72,7 +72,9 @@ The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somew
 | ⌥ + arrow, ⌥⇧ + arrow | Focus / swap by arrow keys. These replace the system's move/select-by-word shortcuts |
 | ⌥F / ⌥⇧F | Fullscreen / toggle floating |
 | ⌥- / ⌥= | Shrink / grow the window |
-| ⌥⇥ | Tap: previous window. Hold ⌥: window list, which switches to the English keyboard layout so you can type to search. Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
+| ⌥⇥ | Tap: previous window. Hold ⌥: window list, which switches to the English keyboard layout so you can type to search. Chinese names match by pinyin, in full or by initials (天氣: `tianqi` or `tq`). Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
+| ⌘⇥ | Replaces the macOS app switcher. Tap: previous app. Hold ⌘: every app in Launchpad, one row each. Apps with windows come first (most recent first; picking one goes to its last-used window), then running apps without windows, then the rest by name; picking one that isn't running opens it |
+| ⌘Space | Opens the ⌘⇥ app list straight away, instead of Spotlight. Press it again to close the list |
 | ⌥R / ⌃S | Resize mode / service mode |
 | ⌥D | Bring a Finder window to this workspace, or open one |
 | ⌥G | Default browser on workspace 1: focus its window there, or switch to workspace 1 and open a new window |
