@@ -288,19 +288,19 @@ popup_bar mem bar
 popup_rows mem used=已使用 "app=App 内存" wired=联动内存 compressed=被压缩 cached=缓存文件 swap=交换 pressure=内存压力
 popup_top mem
 
-# ---- CPU、GPU 都是 图标 + 曲线 + 百分比。曲线画在 background 里，SketchyBar 把它的底边贴在栏的下沿附近：
-#      整个项上移 2、图标和文字再下移 2，曲线就和文字居中对齐了
+# ---- CPU、GPU 都是 曲线 + 百分比（不放图标：曲线就看得出是什么，面板标题里有图标）。
+#      曲线画在 background 里，SketchyBar 把它的底边贴在栏的下沿附近：整个项上移 2、文字再下移 2，曲线就和文字居中对齐了
 #      （栏高 24、曲线高 16、底边离栏底约 2：(24 - 16) / 2 - 2 = 2；栏高 32 时是 6）。
 #      弹出面板里的详细曲线两个都是蓝色。栏上的曲线 GRAPH_WIDTH 个点（每 2 秒一个，24 个点约 50 秒）----
 GRAPH_WIDTH=24
-graph_item() { # <项> <图标> <颜色> <填充色>
+graph_item() { # <项> <颜色> <填充色>
     sketchybar --add graph "$1" right $GRAPH_WIDTH \
-        --set "$1" icon="$2" icon.color="$3" label.color="$3" label.width=$PERCENT_WIDTH \
-            graph.color="$3" graph.fill_color="$4" graph.line_width=1.0 \
-            background.height=16 y_offset=2 icon.y_offset=-2 label.y_offset=-2 \
+        --set "$1" icon.drawing=off label.color="$2" label.width=$PERCENT_WIDTH \
+            graph.color="$2" graph.fill_color="$3" graph.line_width=1.0 \
+            background.height=16 y_offset=2 label.y_offset=-2 \
             script="$PLUGINS/hover.sh"
 }
-graph_item cpu 󰻠 $BAR_BLUE $BAR_BLUE_FILL
+graph_item cpu $BAR_BLUE $BAR_BLUE_FILL
 popup cpu
 popup_title cpu 󰻠 $BAR_BLUE
 popup_graph cpu history $BLUE $BLUE_FILL
@@ -308,7 +308,7 @@ popup_rows cpu user=用户 system=系统 idle=空闲 load=平均负载 uptime=�
 popup_top cpu
 
 # ---- GPU ----
-graph_item gpu 󰾲 $BAR_PURPLE $BAR_PURPLE_FILL
+graph_item gpu $BAR_PURPLE $BAR_PURPLE_FILL
 popup gpu
 popup_title gpu 󰾲 $BAR_PURPLE
 popup_graph gpu history $BLUE $BLUE_FILL
