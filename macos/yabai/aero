@@ -330,15 +330,32 @@ front_pid() {
     lsappinfo info -only pid "$(lsappinfo front)" 2>/dev/null | tr -cd '0-9'
 }
 
+# 正在处理的聚焦请求（窗口 id）记在 focus-target 里，处理完就删掉。它在的时候 ensure-focus 不插手，
+# 旧请求在后台盯焦点的进程看到它变了也马上退出：不然两边会把焦点抢来抢去（⌥⇥ / ⌘⇥ 连按时 Zotero 和 iTerm2
+# 来回闪，慢应用被连着聚焦好几次，yabai 等它最长 1 秒，这期间所有查询都卡住）。
+# 被打断留下的过 3 秒就不算了
+focus_pending() {
+    [ -n "$(find "$STATE/focus-target" -mtime -3s 2>/dev/null)" ]
+}
+
+focus_done() { # <窗口id>
+    [ "$(cat "$STATE/focus-target" 2>/dev/null)" = "$1" ] && rm -f "$STATE/focus-target"
+    return 0
+}
+
 cmd_focus_window() {
     local id=${1:-} sp pid
     [ -n "$id" ] || return 1
-    echo "$id" >"$STATE/focus-target"   # 最新的聚焦请求；下面后台盯焦点的进程看到它变了就退出
+    echo "$id" >"$STATE/focus-target"
     yabai -m window "$id" --deminimize 2>/dev/null
     read -r sp pid < <(yabai -m query --windows --window "$id" 2>/dev/null | jq -r '"\(.space) \(.pid)"')
-    [ -n "$sp" ] && [ "$sp" != null ] || return 1
+    if [ -z "$sp" ] || [ "$sp" = null ]; then
+        focus_done "$id"
+        return 1
+    fi
     if [ "$sp" = "$(current_space)" ]; then
         yabai -m window --focus "$id" 2>/dev/null
+        focus_done "$id"
         return 0
     fi
     workspace_focus "$sp"
@@ -347,16 +364,19 @@ cmd_focus_window() {
     # 没有就是 Finder，也就是桌面本身），比切换晚 0.1-0.3 秒，把刚才的聚焦抢走：窗口在最前面，
     # 却是未激活的样子，按键也进不去（比如 Gemini 和关了窗口的微信在同一个桌面时）。
     # 所以在后台盯 0.6 秒左右，被抢走就重新聚焦；有了新的聚焦请求、或者已经离开这个桌面就不管了。
+    # 查一遍要几十毫秒，动手前再看一眼有没有新的请求：⌥⇥ 连按时，这中间常常已经切走了。
     # （不能先聚焦再切桌面：那样桌面不切，窗口看不见却拿着焦点；
     #  也不能先干等 macOS 那一下：它不一定会发生，干等最多要 1 秒。）
     (
         for _ in 1 2 3 4 5 6; do
             sleep 0.05
             [ "$(cat "$STATE/focus-target" 2>/dev/null)" = "$id" ] || exit 0
-            [ "$(current_space)" = "$sp" ] || exit 0
-            [ "$(front_pid)" = "$pid" ] && [ "$(yabai -m query --windows --window 2>/dev/null | jq -r .id)" = "$id" ] ||
-                yabai -m window --focus "$id" 2>/dev/null
+            [ "$(current_space)" = "$sp" ] || break
+            [ "$(front_pid)" = "$pid" ] && [ "$(yabai -m query --windows --window 2>/dev/null | jq -r .id)" = "$id" ] && continue
+            [ "$(cat "$STATE/focus-target" 2>/dev/null)" = "$id" ] || exit 0
+            yabai -m window --focus "$id" 2>/dev/null
         done
+        focus_done "$id"
     ) >/dev/null 2>&1 &
     return 0
 }
@@ -424,6 +444,7 @@ cmd_toggle_space_float() {
 # 切桌面之后（⌥N、⌃H/⌃L、触控板、调度中心……）macOS 常常再激活一下别的应用（这个桌面上次用的，
 # 没有就是 Finder，也就是桌面本身），焦点就不在这个桌面的窗口上：窗口看得见，⌥⇧F、换位置之类却找不到它。
 # yabai 的 space_changed 信号调这里：0.6 秒内焦点不在这个桌面的窗口上，就聚焦这个桌面上最近用过的窗口。
+# aero focus-window（⌥⇥ / ⌘⇥ 等）引起的切换它自己会盯，这里不插手（见 focus_pending）。
 cmd_ensure_focus() {
     local sp pid target _
     sp=$(current_space)
@@ -431,11 +452,14 @@ cmd_ensure_focus() {
     yabai -m query --spaces --space | jq -e '."is-native-fullscreen"' >/dev/null && return 0
     for _ in 1 2 3 4 5 6; do
         sleep 0.1
+        focus_pending && return 0
         [ "$(current_space)" = "$sp" ] || return 0   # 又切走了
         pid=$(yabai -m query --windows --window 2>/dev/null | jq -r --argjson sp "$sp" 'select(.space == $sp) | .pid')
         [ -n "$pid" ] && [ "$pid" = "$(front_pid)" ] && continue
         target=$(space_windows_mru "$sp" | head -1)
         [ -n "$target" ] || return 0                 # 空桌面
+        # 上面几步要几十毫秒：动手前再确认一次没有切走、也没有新的聚焦请求
+        if focus_pending || [ "$(current_space)" != "$sp" ]; then return 0; fi
         yabai -m window --focus "$target" 2>/dev/null
     done
     return 0
