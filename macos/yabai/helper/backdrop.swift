@@ -7,6 +7,7 @@
 //
 // 窗口层级 2：普通窗口（0）之上，SketchyBar 的栏（topmost=window，浮动窗口层级 3）之下。不接收鼠标。
 // 每条只放在自己那块屏的普通桌面上，不放在原生全屏的桌面上（SketchyBar 在那上面也不画栏），见 placeOnDesktops。
+// 不走原生全屏、而是用一个窗口盖满整块屏的（PowerPoint 放映等），把栏和底板一起降到普通窗口下面，见 checkCovered。
 // 每 3 秒问一次 SketchyBar 栏的高度和是否隐藏，顺便看壁纸换没换（切换桌面时也看，每个桌面可以有不同的壁纸）。
 // 问不到时看 SketchyBar 的进程还在不在，不在了才退出：刚启动时它往往还在执行 sketchybarrc，睡眠唤醒后也要重建栏，
 // 这些时候都问不到（之前连着问不到 3 次就退出，唤醒后底板就没了）。
@@ -40,6 +41,8 @@ final class BarBackdrop {
     var hidden = false
     var wallpapers = ""   // 各屏的位置、壁纸路径和修改时间；变了就重画
     var generation = 0    // 第几次重画：后台算得慢的旧图不要
+    var lowered = false   // 有窗口盖满了某块屏，栏和底板降到了普通窗口下面（见 checkCovered）
+    var level: NSWindow.Level { NSWindow.Level(rawValue: lowered ? -21 : 2) }   // 降下去时在栏（-20）下面
 
     func run() {
         let app = NSApplication.shared
@@ -53,6 +56,7 @@ final class BarBackdrop {
             self?.checkWallpaper()
         }
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.sync() }
+        Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in self?.checkCovered() }.tolerance = 0.05
         app.run()
     }
 
@@ -75,6 +79,7 @@ final class BarBackdrop {
             if windows.isEmpty { height = 24; rebuild() }   // 先按 24 高建出来
             return
         }
+        if ((bar["topmost"] as? String) == "off") != lowered { setTopmost() }   // SketchyBar 重载过（又成了 window）
         let newHeight = CGFloat((bar["height"] as? NSNumber)?.doubleValue ?? 24)
         let newHidden = (bar["hidden"] as? String) == "on" || (bar["position"] as? String) == "bottom"
         if newHeight != height || newHidden != hidden || windows.isEmpty {
@@ -126,6 +131,50 @@ final class BarBackdrop {
                   let name = CFUUIDCreateString(nil, uuid) else { return false }
             return CGSSpaceGetType(cid, CGSManagedDisplayGetCurrentSpace(cid, name)) == 4
         })
+    }
+
+    /// PowerPoint 放映（还有不走原生全屏的视频、游戏）是普通桌面上一个层级 0、盖满整块屏的窗口。SketchyBar 只在原生全屏的
+    /// 桌面上藏栏，管不到这种；栏和底板又都在普通窗口之上，就压在放映的画面上。这时把两者都降到普通窗口下面，让它盖住：
+    /// 栏 topmost=off（层级 -20），底板 -21。不直接藏：SketchyBar 没法只藏一块屏上的栏，降下去则只有被盖住的屏看不到。
+    /// 每 0.2 秒看一次窗口列表（约 0.5 ms）：放映开始时程序没有切换、桌面也没变，没有通知可等
+    func checkCovered() {
+        guard coveredByWindow() != lowered else { return }
+        lowered.toggle()
+        for window in windows.values { window.level = level }
+        setTopmost()
+    }
+
+    func setTopmost() {
+        let value = lowered ? "off" : "window"   // window 是 sketchybarrc 里的设置（查询时它报成 on，所以没法照着恢复）
+        work.async { [sketchybar] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: sketchybar)
+            process.arguments = ["--bar", "topmost=\(value)"]
+            try? process.run()
+            process.waitUntilExit()
+        }
+    }
+
+    /// 有没有哪块屏（原生全屏的除外）最上面的普通窗口正好盖满整块屏。没开"自动隐藏程序坞"时，最大化的窗口盖不到程序坞那一截
+    func coveredByWindow() -> Bool {
+        let skip = fullscreenDisplays()
+        let displays = NSScreen.screens.compactMap(displayID).filter { !skip.contains($0) }.map(CGDisplayBounds)
+        guard !displays.isEmpty else { return false }
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        var done = Set<Int>()   // 已经找到最上面那个窗口的屏
+        for window in info {    // 从前往后
+            guard window[kCGWindowLayer as String] as? Int == 0,
+                  (window[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let dict = window[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: dict as CFDictionary),
+                  bounds.width >= 100, bounds.height >= 100 else { continue }   // 不算看不见的小窗口
+            for (i, display) in displays.enumerated() where !done.contains(i) && bounds.intersects(display) {
+                if bounds.contains(display) { return true }
+                done.insert(i)
+            }
+            if done.count == displays.count { break }
+        }
+        return false
     }
 
     /// 每条底板放到自己那块屏的所有普通桌面上，从别的桌面（原生全屏的）上拿掉。
@@ -187,7 +236,7 @@ final class BarBackdrop {
 
     func makeWindow(_ frame: NSRect) -> NSWindow {
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.level = NSWindow.Level(rawValue: 2)
+        window.level = level
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
