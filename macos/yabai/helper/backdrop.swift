@@ -7,7 +7,7 @@
 //
 // 窗口层级 2：普通窗口（0）之上，SketchyBar 的栏（topmost=window，浮动窗口层级 3）之下。不接收鼠标。
 // 每条只放在自己那块屏的普通桌面上，不放在原生全屏的桌面上（SketchyBar 在那上面也不画栏），见 placeOnDesktops。
-// 不走原生全屏、而是用一个窗口盖满整块屏的（PowerPoint 放映等），把栏和底板一起降到普通窗口下面，见 checkCovered。
+// 不走原生全屏、而是用一个窗口盖满整块屏的（PowerPoint 放映等），把栏和底板一起藏起来，见 checkCovered。
 // 每 3 秒问一次 SketchyBar 栏的高度和是否隐藏，顺便看壁纸换没换（切换桌面时也看，每个桌面可以有不同的壁纸）。
 // 问不到时看 SketchyBar 的进程还在不在，不在了才退出：刚启动时它往往还在执行 sketchybarrc，睡眠唤醒后也要重建栏，
 // 这些时候都问不到（之前连着问不到 3 次就退出，唤醒后底板就没了）。
@@ -41,8 +41,7 @@ final class BarBackdrop {
     var hidden = false
     var wallpapers = ""   // 各屏的位置、壁纸路径和修改时间；变了就重画
     var generation = 0    // 第几次重画：后台算得慢的旧图不要
-    var lowered = false   // 有窗口盖满了某块屏，栏和底板降到了普通窗口下面（见 checkCovered）
-    var level: NSWindow.Level { NSWindow.Level(rawValue: lowered ? -21 : 2) }   // 降下去时在栏（-20）下面
+    var covered = false   // 有窗口盖满了某块屏，栏和底板都藏起来了（见 checkCovered）
 
     func run() {
         let app = NSApplication.shared
@@ -79,9 +78,10 @@ final class BarBackdrop {
             if windows.isEmpty { height = 24; rebuild() }   // 先按 24 高建出来
             return
         }
-        if ((bar["topmost"] as? String) == "off") != lowered { setTopmost() }   // SketchyBar 重载过（又成了 window）
+        // 栏藏不藏由这里管（见 checkCovered）：SketchyBar 重载过、或者上次没发成功，就再发一次
+        if ((bar["hidden"] as? String) == "on") != covered { hideBar() }
         let newHeight = CGFloat((bar["height"] as? NSNumber)?.doubleValue ?? 24)
-        let newHidden = (bar["hidden"] as? String) == "on" || (bar["position"] as? String) == "bottom"
+        let newHidden = (bar["position"] as? String) == "bottom"
         if newHeight != height || newHidden != hidden || windows.isEmpty {
             height = newHeight
             hidden = newHidden
@@ -134,24 +134,31 @@ final class BarBackdrop {
     }
 
     /// PowerPoint 放映（还有不走原生全屏的视频、游戏）是普通桌面上一个层级 0、盖满整块屏的窗口。SketchyBar 只在原生全屏的
-    /// 桌面上藏栏，管不到这种；栏和底板又都在普通窗口之上，就压在放映的画面上。这时把两者都降到普通窗口下面，让它盖住：
-    /// 栏 topmost=off（层级 -20），底板 -21。不直接藏：SketchyBar 没法只藏一块屏上的栏，降下去则只有被盖住的屏看不到。
+    /// 桌面上藏栏，管不到这种；栏和底板又都在普通窗口之上，就压在放映的画面上。这时把两者都藏起来（hidden=on，底板透明）。
+    /// SketchyBar 从命令行只能所有屏一起藏，所以另一块屏上的栏也跟着藏（放映时那块屏多半是演示者视图，本来也被盖着）。
+    /// 不用 topmost=off 降到普通窗口下面：SketchyBar 改 topmost 会拆掉重建所有栏的窗口（一个图标一个窗口），
+    /// 图标一个接一个地消失，前后拖 0.2 秒，恢复时整条栏还要闪一下（逐帧量过）；hidden 是所有窗口同时挪走。
     /// 每 0.2 秒看一次窗口列表（约 0.5 ms）：放映开始时程序没有切换、桌面也没变，没有通知可等
     func checkCovered() {
-        guard coveredByWindow() != lowered else { return }
-        lowered.toggle()
-        for window in windows.values { window.level = level }
-        setTopmost()
+        guard coveredByWindow() != covered else { return }
+        covered.toggle()
+        logLine(covered ? "bar-backdrop：有窗口盖满了屏幕，藏起栏" : "bar-backdrop：栏回来")
+        hideBar()
     }
 
-    func setTopmost() {
-        let value = lowered ? "off" : "window"   // window 是 sketchybarrc 里的设置（查询时它报成 on，所以没法照着恢复）
-        work.async { [sketchybar] in
+    /// 栏按 covered 藏起来或放出来，SketchyBar 照做了再藏 / 放底板：两者一起消失、一起出现
+    func hideBar() {
+        let hide = covered
+        work.async { [weak self, sketchybar] in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: sketchybar)
-            process.arguments = ["--bar", "topmost=\(value)"]
+            process.arguments = ["--bar", "hidden=\(hide ? "on" : "off")"]
             try? process.run()
             process.waitUntilExit()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                for window in self.windows.values { window.alphaValue = self.covered ? 0 : 1 }
+            }
         }
     }
 
@@ -236,7 +243,8 @@ final class BarBackdrop {
 
     func makeWindow(_ frame: NSRect) -> NSWindow {
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.level = level
+        window.level = NSWindow.Level(rawValue: 2)
+        window.alphaValue = covered ? 0 : 1
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
@@ -271,7 +279,9 @@ final class BarBackdrop {
         guard let url, let image = CIImage(contentsOf: url),
               image.extent.width > 0, image.extent.height > 0 else { return nil }
         let k: CGFloat = 0.25
-        let size = CGSize(width: screen.width * k, height: screen.height * k)
+        // 取整：内置屏高 1050，× 0.25 = 262.5，边上那半个像素是半透明的，clampedToExtent 再把它往外铺开，
+        // 糊出来整条都半透明（看着就是栏透明了）。所以尺寸取整，铺好的图也只留屏幕范围内整像素的部分
+        let size = CGSize(width: floor(screen.width * k), height: floor(screen.height * k))
         // 铺满屏幕、居中裁掉多出来的部分（系统设置里的"填充屏幕"）
         let scale = max(size.width / image.extent.width, size.height / image.extent.height)
         let placed = image
@@ -279,6 +289,7 @@ final class BarBackdrop {
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             .transformed(by: CGAffineTransform(translationX: (size.width - image.extent.width * scale) / 2,
                                                y: (size.height - image.extent.height * scale) / 2))
+            .cropped(to: CGRect(origin: .zero, size: size))
         let strip = CGRect(x: 0, y: size.height - height * k, width: size.width, height: height * k)
         let darken = CIVector(x: -10 / 255, y: -10 / 255, z: -10 / 255, w: 0)
         let blurred = placed.clampedToExtent()
