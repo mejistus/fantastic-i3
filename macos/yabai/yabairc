@@ -95,7 +95,8 @@ done
 # ---- [[on-window-detected]] ----
 # rule <工作区|-> <条件 与 属性…>
 #   layout floating → manage=off    layout tiling → manage=on    move-node-to-workspace X → 第一个参数 X
-#   现在都是 -：程序启动后留在当前工作区，不再自动挪到固定的工作区（想恢复某个就把 - 改回工作区号）
+#   大多是 -：程序启动后留在当前工作区。有固定工作区的：Edge → 1，iTerm2 / kitty / 终端 → 5，微信 → 10。
+#   规则只挪不跟（--apply 时会到处跳）；跟过去交给 follow
 # center <条件…>
 #   exec-and-forget center-window → 浮动窗口出现时居中
 #
@@ -127,6 +128,14 @@ center() {
     yabai -m signal --add event=window_created action="$AERO center \$YABAI_WINDOW_ID" "$@"
 }
 TILE='subrole=^AXStandardWindow$'   # 强制平铺只针对普通窗口，对话框 / 弹窗照常浮动
+# follow <工作区> <应用名正则> [--on-activate]：有固定工作区的应用，新开的窗口被挪过去时人跟过去；
+# 带 --on-activate 的，从程序坞等激活它（当前桌面上没有它的窗口）时也跟过去（见 aero follow）
+follow() {
+    yabai -m signal --add event=window_created app="$2" action="$AERO follow window \$YABAI_WINDOW_ID $1"
+    [ "${3:-}" = --on-activate ] &&
+        yabai -m signal --add event=application_activated app="$2" action="$AERO follow app \$YABAI_PROCESS_ID"
+    return 0
+}
 
 # 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ / ⌘⇥ 切换列表
 rule - app='^(Calculator|計算機|计算器|Archive Utility|封存工具程式|归档实用工具)$' manage=off
@@ -143,7 +152,8 @@ rule - app='^(Cherry Studio|CherryStudio)$' manage=off
 center app='^(Cherry Studio|CherryStudio)$'
 # 微信：所有窗口都去工作区 10，主窗口平铺，其他窗口（聊天小窗、图片、朋友圈…）浮动。
 # 按应用名分配工作区，不按标题：主窗口刚出现时标题可能还是空的，规则只在窗口出现的那一刻匹配一次。
-rule - app='^(WeChat|微信)$'
+rule 10 app='^(WeChat|微信)$' "$TILE"                                        # 只挪普通窗口：截图时的全屏遮罩之类别动
+follow 10 '^(WeChat|微信)$'
 rule - app='^(WeChat|微信)$' title!='^(微信|WeChat)?$' manage=off
 yabai -m signal --add event=window_created app='^(WeChat|微信)$' action="$AERO float-fixed \$YABAI_WINDOW_ID"  # 扫码登录窗口也叫"微信"，但不能调整大小
 rule - app='^Microsoft PowerPoint$' manage=off
@@ -154,9 +164,10 @@ rule - app='^QQ$' manage=off
 rule - app='^Finder$' manage=off
 rule - app='^(闪电说|閃電說)' manage=off                                    # cn.shandianshuo.desktop
 rule - app='^Clash Verge' manage=off
-rule - app='^kitty$' manage=off
+rule 5 app='^kitty$' manage=off
 center app='^kitty$'
-rule - app='^iTerm2$' "$TILE" manage=on
+rule 5 app='^iTerm2$' "$TILE" manage=on
+follow 5 '^(iTerm2|kitty|Terminal|終端機|终端)$'
 rule - app='^(哔哩哔哩|嗶哩嗶哩|bilibili)$' manage=off
 rule - app='^(QQMusic|QQ音乐|QQ音樂)$' manage=off
 rule - app='^Claude$' "$TILE" manage=on
@@ -175,7 +186,7 @@ rule - app='^Photo Booth$' manage=off
 rule - app='^App Store$' manage=off
 rule - title='^(Figure*)' app!="$TAKEN" manage=off
 rule - title='^(python*)' app!="$TAKEN" manage=off
-rule - app='^(Terminal|終端機|终端)$' manage=off
+rule 5 app='^(Terminal|終端機|终端)$' manage=off
 rule - app='^(Notes|備忘錄|备忘录)$' manage=off
 rule - app='^Typora$' manage=off
 rule - app='^Obsidian$' manage=off
@@ -185,7 +196,8 @@ rule - app='^(Douyin|抖音)$' manage=off
 rule - app='^Spotify$' manage=off
 rule - app='^(Music|音樂|音乐)$' manage=off
 rule - app='^(Safari|Safari浏览器)$' manage=off
-rule - app='^Microsoft Edge$' manage=off
+rule 1 app='^Microsoft Edge$' "$TILE" manage=on                                # 画中画、弹窗不是普通窗口：照常浮动、留在原地
+follow 1 '^Microsoft Edge$' --on-activate
 rule - app='^Arc$' manage=off
 rule - app='^Brave Browser$' manage=off
 rule - app='^Firefox$' manage=off

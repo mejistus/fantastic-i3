@@ -13,9 +13,12 @@
 //       --apps：列表末尾再加上 Dock 里亮着点、但没有窗口的应用（选中时输出 app:pid:bundle id）。
 //       --launchpad：应用列表（stdin 每个应用一行），和 --apps 一样加上没有窗口的应用，最后是启动台里其余的应用，
 //                    按名字排序（选中时输出 app::bundle id，在后台运行的带 pid）。
-//       弹出时切到系统的英文键盘布局（U.S. / ABC），打字直接模糊搜索，不经过中文输入法；汉字用拼音搜（全拼或首字母）。
+//       打字直接模糊搜索，按键不经过输入法（见 PlainFieldEditor），也不切换输入法；汉字用拼音搜（全拼或首字母）。
 //       ↑↓ / ⇥⇧⇥ / ⌥⇥⌥⇧⇥ / ⌘⇥⌘⇧⇥ / ⌃N⌃P 选择，回车或单击切换（输出窗口 id），Esc 关闭（退出码 1）。
 //       ⌘+ / ⌘- 调整字号，⌘0 恢复默认；字号会记住。
+//   aero-helper app-names <bundle id>
+//       打印这个应用可能叫的名字，每行一个（运行中的显示名、CFBundleName、可执行文件名……）。yabai 规则按应用名匹配，
+//       window_switcher 用它找应用固定的工作区（应用还没运行时也行，不靠 Spotlight）。
 //   aero-helper default-browser
 //       打印默认浏览器的 bundle id 和正在运行的进程号：com.microsoft.edgemac<TAB>123 456
 //   aero-helper option-fn <命令>
@@ -116,12 +119,6 @@ func orderedOut(_ ids: [UInt32]) -> [UInt32] {
 }
 
 // MARK: - 输入法
-
-/// 切到系统的英文键盘布局：启用了哪个就用哪个（U.S.、ABC……），由系统决定
-func selectEnglishInput() {
-    guard let english = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue() else { return }
-    TISSelectInputSource(english)
-}
 
 /// 当前输入法的简称：中文输入法 → 中，日文 → あ，韩文 → 한，其他（英文键盘布局等）→ 语言代码大写
 func inputSourceLabel() -> String {
@@ -297,6 +294,13 @@ func searchKeys(_ text: String) -> [[Character]] {
     return [Array(text), Array((pinyin as String).lowercased())]
 }
 
+/// 搜索框的字段编辑器：没有输入上下文，按键不交给输入法，直接是键盘上的字母，也不会出候选框。
+/// 以前是弹出时切到系统的英文键盘布局，可搜狗这类第三方输入法的中英文是它自己内部的状态（只向系统登记了一个拼音模式），
+/// 切不到"搜狗的英文"；切到系统英文的话搜狗就不再是当前输入法，它自己的快捷键（⌥⌥ 等）都用不了。这样输入法一直不动
+final class PlainFieldEditor: NSTextView {
+    override var inputContext: NSTextInputContext? { nil }
+}
+
 final class KeyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -323,7 +327,7 @@ func fuzzyScore(_ query: [Character], _ text: [Character]) -> Int? {
     return qi == query.count ? score * 1000 - last : nil
 }
 
-final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
+final class Switcher: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
     static let defaultFontSize: CGFloat = 28
     let store = UserDefaults(suiteName: "fantastic-i3.window-switcher")!
 
@@ -344,6 +348,11 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
     let scroll = NSScrollView()
     var icons: [String: NSImage] = [:]
     var top: CGFloat?
+    let fieldEditor: PlainFieldEditor = {
+        let editor = PlainFieldEditor()
+        editor.isFieldEditor = true
+        return editor
+    }()
 
     init(arguments: [String]) {
         var initialFont = Switcher.defaultFontSize
@@ -406,6 +415,7 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.contentView = effect
+        panel.delegate = self   // 给搜索框换上 PlainFieldEditor
 
         search.isBordered = false
         search.drawsBackground = false
@@ -462,7 +472,6 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
 
         applyFont()
         filter("")
-        selectEnglishInput()
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(search)
@@ -540,6 +549,10 @@ final class Switcher: NSObject, NSApplicationDelegate, NSTableViewDataSource, NS
         print(shown[row].id)
         fflush(stdout)
         exit(0)
+    }
+
+    func windowWillReturnFieldEditor(_ sender: NSWindow, to client: Any?) -> Any? {
+        (client as? NSTextField) === search ? fieldEditor : nil
     }
 
     @objc func clicked() { confirm(table.clickedRow) }
@@ -628,6 +641,15 @@ case "wait-release":
     exit(waitRelease(mask, timeout: timeout) ? 0 : 1)
 case "native-hotkeys":
     setNativeHotkeys(arguments.dropFirst().first == "on")
+case "app-names":
+    guard let bundle = arguments.dropFirst().first,
+          let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { exit(1) }
+    let info = Bundle(url: url)?.infoDictionary ?? [:]
+    let names = [NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first?.localizedName,
+                 info["CFBundleDisplayName"] as? String, info["CFBundleName"] as? String,
+                 info["CFBundleExecutable"] as? String, url.deletingPathExtension().lastPathComponent]
+    var seen = Set<String>()
+    for case let name? in names where !name.isEmpty && seen.insert(name).inserted { print(name) }
 case "default-browser":
     guard let browser = defaultBrowser() else { exit(1) }
     print("\(browser.bundle)\t\(browser.pids.map(String.init).joined(separator: " "))")
@@ -662,6 +684,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | app-names <bundle id> | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
     exit(2)
 }
