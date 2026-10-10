@@ -72,13 +72,15 @@ The configs expect the repo at `~/Documents/fantastic-i3`. If you clone it somew
 | ⌥ + arrow, ⌥⇧ + arrow | Focus / swap by arrow keys. These replace the system's move/select-by-word shortcuts |
 | ⌥F / ⌥⇧F | Fullscreen / toggle floating |
 | ⌥- / ⌥= | Shrink / grow the window |
-| ⌥⇥ | Tap: previous window. Hold ⌥: window list, which switches to the English keyboard layout so you can type to search. Chinese names match by pinyin, in full or by initials (天氣: `tianqi` or `tq`). Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
+| ⌥⇥ | Window list, with the previous window selected (⌥⇥ then Return goes back to it). Type to search: keys go straight into the search box without passing through your input method, which stays as it was (Sogou keeps its own state and shortcuts). Chinese names match by pinyin, in full or by initials (天氣: `tianqi` or `tq`). Running apps without windows are listed at the end; picking one works like clicking it in the Dock |
 | ⌘⇥ | Replaces the macOS app switcher. Tap: previous app. Hold ⌘: every app in Launchpad, one row each. Apps with windows come first (most recent first; picking one goes to its last-used window), then running apps without windows, then the rest by name; picking one that isn't running opens it |
 | ⌘Space | Opens the ⌘⇥ app list straight away, instead of Spotlight. Press it again to close the list |
 | ⌥R / ⌃S | Resize mode / service mode |
 | ⌥D | Bring a Finder window to this workspace, or open one |
 | ⌥G | Default browser on workspace 1: focus its window there, or switch to workspace 1 and open a new window |
 | ⌥⇧⇥ | Move the workspace to the next monitor (needs the scripting addition) |
+
+New windows of a few apps go to a fixed workspace: Microsoft Edge to 1 (tiled), iTerm2, kitty and Terminal to 5, WeChat to 10. Other apps open on the current workspace. When you open a new window of one of these apps from elsewhere (from the Dock, for example), you follow it to its workspace. Edge also takes you to its window when you activate it from the Dock or a link, even though macOS's "switch to a Space with open windows for the application" is off. Picking one of these apps in the ⌥⇥, ⌘⇥ or ⌘Space list switches to its workspace before opening it.
 
 The macOS menu bar is replaced by a SketchyBar top bar styled like the i3 polybar (One Dark, Maple Mono NF). It is as tall as the menu bar (24 pt) and frosted like it. Move the mouse to the top edge to reach the real menu bar.
 

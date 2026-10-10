@@ -11,6 +11,8 @@
 #   aero toggle-float                                        ⌥⇧F：当前窗口在平铺 / 浮动之间切换
 #   aero toggle-space-float                                  service 模式的 f：当前工作区的窗口全部平铺 / 全部浮动
 #   aero ensure-focus                                        切桌面后焦点不在这个桌面的窗口上时补一下（space_changed 信号调）
+#   aero follow window <窗口 id> <工作区> | app <pid>         有固定工作区的应用：跟过去（yabairc 里 follow 的信号调）
+#   aero app-workspace <应用名>...                           应用固定的工作区（yabairc 里带工作区号的规则），没有就不输出
 #   aero focus-window <窗口 id>                              聚焦窗口（在别的桌面就先切过去）
 #   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌥⇥ 窗口切换器用）
 #   aero helper <…>                                          运行 aero-helper（需要时自动编译）
@@ -443,6 +445,58 @@ cmd_toggle_space_float() {
 
 # 切桌面之后（⌥N、⌃H/⌃L、触控板、调度中心……）macOS 常常再激活一下别的应用（这个桌面上次用的，
 # 没有就是 Finder，也就是桌面本身），焦点就不在这个桌面的窗口上：窗口看得见，⌥⇧F、换位置之类却找不到它。
+# 有固定工作区的应用（yabairc 里的 follow：Edge、终端、微信）跟过去：
+#   window <id> <工作区>：新窗口被规则挪到它的工作区（规则只挪不跟），就跟过去——只要这个应用在前台，或者是刚启动的
+#     （从程序坞启动时，窗口一被挪走，macOS 就把前台还给了当前桌面上的应用）。开机恢复的窗口、后台弹出的窗口不拽人。
+#     挪动可能比信号晚一点，最多等 0.5 秒
+#   app <pid>：从程序坞、别的应用里的链接等激活它，当前桌面上又没有它的窗口，就切到它最近用过的窗口（只给 Edge 用）。
+#     系统设置里"切换到应用时切换到它所在的空间"是关着的，这里只对 Edge 打开。等 0.2 秒再看：一闪而过的激活
+#     （列表关掉时系统把前台还给原来的应用、启动时系统把前台转来转去）不算，⌥⇥ / ⌘⇥ 正在切换时也不插手；
+#     终端、微信不这样跟：它们常被这样一闪而过地激活，跟过去就会把人拽走（录到过）
+cmd_follow() {
+    local sp mru win
+    case ${1:-} in
+        window)
+            local id=${2:-} ws=${3:-} pid
+            [ -n "$id" ] && [ -n "$ws" ] || return 1
+            [ "$(current_space)" = "$ws" ] && return 0
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+                read -r sp pid < <(yabai -m query --windows --window "$id" 2>/dev/null |
+                    jq -r 'select(.subrole == "AXStandardWindow") | "\(.space) \(.pid)"')
+                [ -n "$sp" ] || return 0                     # 不是普通窗口，或者已经关了
+                if [ "$sp" = "$ws" ]; then
+                    # 运行时间（[[dd-]hh:]mm:ss）不到 5 秒就算刚启动
+                    if [ "$(front_pid)" = "$pid" ] || ps -o etime= -p "$pid" | grep -Eq '^ *00:0[0-4]$'; then
+                        cmd_focus_window "$id"
+                    fi
+                    return 0
+                fi
+                sleep 0.05
+            done ;;
+        app)
+            local pid=${2:-}
+            [ -n "$pid" ] || return 1
+            sleep 0.2
+            focus_pending && return 0
+            [ "$(front_pid)" = "$pid" ] || return 0
+            sp=$(current_space)
+            mru=$(jq -R -s 'split("\n") | map(select(length > 0) | tonumber)' "$STATE/mru" 2>/dev/null || echo '[]')
+            win=$(yabai -m query --windows | jq -r --argjson pid "$pid" --argjson sp "$sp" --argjson mru "$mru" '
+                [.[] | select(.pid == $pid and .subrole == "AXStandardWindow" and (."is-minimized" | not))]
+                | if any(.space == $sp) then empty
+                  else sort_by(.id as $i | $mru | index($i) // 1e6) | first | .id // empty end')
+            [ -n "$win" ] && cmd_focus_window "$win" ;;
+        *) return 1 ;;
+    esac
+    return 0
+}
+
+cmd_app_workspace() {
+    [ $# -gt 0 ] || return 1
+    yabai -m rule --list | jq -r '[.[] | select(.space > 0 and .title == "") as $rule
+        | $ARGS.positional[] | select(test($rule.app)) | $rule.space] | first // empty' --args "$@"
+}
+
 # yabai 的 space_changed 信号调这里：0.6 秒内焦点不在这个桌面的窗口上，就聚焦这个桌面上最近用过的窗口。
 # aero focus-window（⌥⇥ / ⌘⇥ 等）引起的切换它自己会盯，这里不插手（见 focus_pending）。
 cmd_ensure_focus() {
@@ -578,6 +632,8 @@ case ${1:-} in
     toggle-float) cmd_toggle_float ;;
     toggle-space-float) cmd_toggle_space_float ;;
     ensure-focus) cmd_ensure_focus ;;
+    follow) shift; cmd_follow "$@" ;;
+    app-workspace) shift; cmd_app_workspace "$@" ;;
     focus-window) shift; cmd_focus_window "$@" ;;
     helper) shift; helper "$@" ;;
     mru-push) shift; cmd_mru_push "$@" ;;

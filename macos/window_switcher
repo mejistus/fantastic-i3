@@ -2,12 +2,12 @@
 # 窗口切换器（yabai 版）
 #   window_switcher --list   立刻弹出所有桌面的窗口列表
 #   window_switcher --back   直接切到上一个用过的窗口（back-and-forth）
-#   window_switcher [--auto] 快速按一下 = --back，按住 ⌥ 超过 HOLD_SECONDS = --list（⌥⇥）
+#   window_switcher [--auto] 快速按一下 = --back，按住 ⌥ 超过 HOLD_SECONDS = --list（⌥⇥ 现在直接用 --list）
 #   window_switcher --apps [--auto | --list | --back]
 #                            按应用切换（⌘⇥）：快速按一下 = 回到上一个用过的应用，按住 ⌘ = 应用列表
 #
 # 列表：带应用图标，按桌面编号排序，上一个用过的窗口已选中；末尾是 Dock 里亮着点、但没有窗口的应用，
-#       选中它就像点 Dock 图标（一般会新开一个窗口）。弹出时切到系统的英文输入法，
+#       选中它就像点 Dock 图标（一般会新开一个窗口）。按键不经过输入法（输入法不切换、不出候选框），
 #       打字模糊搜索（输入桌面编号也行，汉字用拼音：天氣 打 tianqi 或 tq），↑↓ 或 ⌥⇥ / ⌥⇧⇥ 选择，回车或单击切换，Esc 关闭，
 #       ⌘+ / ⌘- 调字号（会记住），⌘0 恢复默认
 # 应用列表：启动台里的所有应用，一个应用一行。最上面是有窗口的（按最近使用，选中就切到它最近用的那个窗口），
@@ -106,6 +106,9 @@ case $id in
         id=${id#app:}
         pid=${id%%:*}
         bundle=${id#*:}
+        # 有固定工作区的应用（yabairc 里带工作区号的规则，按应用名匹配）：先切过去再打开，新窗口直接开在那里
+        ws=$(IFS=$'\n'; "$AERO" app-workspace $("$AERO" helper app-names "$bundle"))   # 每行一个名字，名字里可能有空格
+        [ -n "$ws" ] && "$AERO" workspace "$ws"
         open -b "$bundle"
         trap - EXIT; rm -rf "$lock"   # 等窗口的时候不挡着下一次 ⌥⇥ / ⌘⇥
         tries=20; [ -z "$pid" ] && tries=100
