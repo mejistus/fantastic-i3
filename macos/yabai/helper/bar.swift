@@ -1,7 +1,7 @@
 // SketchyBar 顶栏的数据（aero-helper bar-stats，由 ../../sketchybar/sketchybarrc 启动）
 //
 // 栏上：GPU、CPU、内存、磁盘的百分比，网速，输入法 —— 每 2 秒推一次（磁盘 30 秒一次）。
-// 弹出详情：点栏上的某项时，plugins/hover.sh（苹果菜单是 apple.sh）打开它的面板，把项名写进
+// 弹出详情：点栏上的某项时，plugins/hover.sh 打开它的面板，把项名写进
 // /tmp/yabai-aero-$USER/bar-hover 并发 SIGUSR1，这里马上、之后每 2 秒算这一项的详情，
 // 推给它弹出面板里的各行（<项>.<行>，在 sketchybarrc 里定义）。
 // 只算正在看的那一项；进程排行这类比较贵的数据只在面板开着时算，而且最多 6 秒算一次。
@@ -420,7 +420,7 @@ final class BarStats {
         DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main
         ) { [weak self] _ in self?.inputChanged() }
-        // hover.sh / apple.sh 打开弹出面板时发 SIGUSR1：马上推那一项的详情，开始盯鼠标
+        // hover.sh 打开弹出面板时发 SIGUSR1：马上推那一项的详情，开始盯鼠标
         signal(SIGUSR1, SIG_IGN)
         signalSource = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
         signalSource?.setEventHandler { [weak self] in

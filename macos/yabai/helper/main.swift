@@ -35,6 +35,8 @@
 //   aero-helper bar-stats [秒]
 //       给 SketchyBar 送数据（常驻，由 sketchybarrc 启动）：每隔几秒（默认 2）推一次 CPU、内存、
 //       GPU（利用率和占用的内存）、网速，磁盘每 30 秒一次；切换输入法时立刻推输入法。SketchyBar 不在了就退出。
+//   aero-helper apple-menu <JSON：栏上  的位置>
+//       SketchyBar 的苹果菜单：弹一个真正的系统菜单，打印选中的那一行（about、settings……），没选退出码 1（见"苹果菜单"）。
 //   aero-helper lock
 //       锁屏（和 ⌃⌘Q 一样，login.framework 的 SACLockScreenImmediate）。SketchyBar 的苹果菜单用。
 //   aero-helper bar-backdrop
@@ -201,6 +203,50 @@ func watchAppActivation(aero: String) -> Never {
     }
     RunLoop.main.run()
     exit(0)
+}
+
+// MARK: - 苹果菜单
+
+/// SketchyBar 栏最左边  的菜单。以前是 SketchyBar 的面板画的，和原生的差得远（不透明的底、字体图标、没有悬停高亮，
+/// 一股塑料感），这里直接弹系统菜单：毛玻璃、圆角、高亮、分隔线、键盘上下键和回车、深浅色都和原生的一样。
+/// 只管显示：选中的那一行的名字打印出来，由 sketchybar/plugins/apple.sh 执行
+final class AppleMenu: NSObject {
+    var chosen: String?
+
+    @objc func pick(_ sender: NSMenuItem) { chosen = sender.representedObject as? String }
+
+    /// rects：SketchyBar 给的  在各块屏上的位置（全局坐标，左上角为原点）。菜单贴在鼠标所在的那个  的左下角
+    func show(rects: [CGRect]) -> String? {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        func add(_ title: String, _ name: String, key: String = "", _ modifiers: NSEvent.ModifierFlags = []) {
+            let item = NSMenuItem(title: title, action: #selector(pick), keyEquivalent: key)
+            item.keyEquivalentModifierMask = modifiers
+            item.target = self
+            item.representedObject = name
+            menu.addItem(item)
+        }
+        add("关于本机", "about")
+        menu.addItem(.separator())
+        add("系统设置…", "settings")
+        add("App Store…", "appstore")
+        menu.addItem(.separator())
+        add("睡眠", "sleep")
+        add("重新启动…", "restart")
+        add("关机…", "shutdown")
+        menu.addItem(.separator())
+        add("锁定屏幕", "lock", key: "q", [.control, .command])
+        add("退出登录“\(NSFullUserName())”…", "logout", key: "q", [.shift, .command])
+
+        let height = NSScreen.screens.first?.frame.height ?? 0   // 主屏高度：全局坐标和 Cocoa 坐标（左下角为原点）互换
+        let mouse = NSEvent.mouseLocation
+        let at = CGPoint(x: mouse.x, y: height - mouse.y)
+        let rect = rects.min { hypot($0.midX - at.x, $0.midY - at.y) < hypot($1.midX - at.x, $1.midY - at.y) }
+            ?? CGRect(x: mouse.x, y: height - mouse.y, width: 0, height: 0)
+        NSApp.activate(ignoringOtherApps: true)
+        menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: height - rect.maxY), in: nil)
+        return chosen
+    }
 }
 
 // MARK: - ⌥ + Caps Lock
@@ -731,6 +777,17 @@ case "ordered-out":
 case "bar-stats":
     let stats = BarStats()   // 要留着强引用：定时器和通知的回调用的是 weak self
     stats.run(interval: Double(arguments.dropFirst().first ?? "") ?? 2)
+case "apple-menu":
+    let json = (try? JSONSerialization.jsonObject(with: Data((arguments.dropFirst().first ?? "[]").utf8))) as? [[String: Any]] ?? []
+    let rects = json.compactMap { entry -> CGRect? in
+        guard let origin = entry["origin"] as? [Double], let size = entry["size"] as? [Double],
+              origin.count == 2, size.count == 2 else { return nil }
+        return CGRect(x: origin[0], y: origin[1], width: size[0], height: size[1])
+    }
+    NSApplication.shared.setActivationPolicy(.accessory)
+    let menu = AppleMenu()   // 要留着强引用：菜单项的 target 是弱引用
+    guard let chosen = menu.show(rects: rects) else { exit(1) }
+    print(chosen)
 case "lock":
     guard let login = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW),
           let symbol = dlsym(login, "SACLockScreenImmediate") else { exit(1) }
@@ -746,6 +803,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | app-names <bundle id> | default-browser | option-fn <命令> | app-watch <aero> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | app-names <bundle id> | default-browser | option-fn <命令> | app-watch <aero> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | apple-menu <位置> | lock\n".data(using: .utf8)!)
     exit(2)
 }
