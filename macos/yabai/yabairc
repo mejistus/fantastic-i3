@@ -128,14 +128,14 @@ center() {
     yabai -m signal --add event=window_created action="$AERO center \$YABAI_WINDOW_ID" "$@"
 }
 TILE='subrole=^AXStandardWindow$'   # 强制平铺只针对普通窗口，对话框 / 弹窗照常浮动
-# follow <工作区> <应用名正则> [--on-activate]：有固定工作区的应用，新开的窗口被挪过去时人跟过去；
-# 带 --on-activate 的，从程序坞等激活它（当前桌面上没有它的窗口）时也跟过去（见 aero follow）
+# follow <工作区> <应用名正则>：有固定工作区的应用，新开的窗口被挪过去时人跟过去（见 aero follow window）
 follow() {
     yabai -m signal --add event=window_created app="$2" action="$AERO follow window \$YABAI_WINDOW_ID $1"
-    [ "${3:-}" = --on-activate ] &&
-        yabai -m signal --add event=application_activated app="$2" action="$AERO follow app \$YABAI_PROCESS_ID"
-    return 0
 }
+# 从程序坞、通知、别的应用里的链接等激活一个应用，而当前桌面上没有它的窗口时，切到它最近用过的窗口（见 aero follow app）。
+# 系统设置里"切换到应用时切换到它所在的空间"是关着的，不然从程序坞点别的桌面上的应用（比如 Outlook）要点两次。
+# 访达除外：切到空桌面时 macOS 会激活它（桌面本身），跟过去就会被拽到访达窗口所在的桌面
+yabai -m signal --add event=application_activated app!='^(Finder|访达|訪達|aero-helper)$' action="$AERO follow app \$YABAI_PROCESS_ID"
 
 # 菜单栏小工具、系统小窗口（AeroSpace 会自动浮动它们）；aero-helper 是 ⌥⇥ / ⌘⇥ 切换列表
 rule - app='^(Calculator|計算機|计算器|Archive Utility|封存工具程式|归档实用工具)$' manage=off
@@ -197,12 +197,18 @@ rule - app='^Spotify$' manage=off
 rule - app='^(Music|音樂|音乐)$' manage=off
 rule - app='^(Safari|Safari浏览器)$' manage=off
 rule 1 app='^Microsoft Edge$' "$TILE" manage=on                                # 画中画、弹窗不是普通窗口：照常浮动、留在原地
-follow 1 '^Microsoft Edge$' --on-activate
+follow 1 '^Microsoft Edge$'
 rule - app='^Arc$' manage=off
 rule - app='^Brave Browser$' manage=off
 rule - app='^Firefox$' manage=off
 rule - title='(Hugging Face|ModelScope|魔搭)' app!="$TAKEN" manage=off
 rule - app='^(System Settings|系統設定|系统设置)$' manage=off
+
+# 有固定工作区的应用（上面带工作区号的规则）一被激活、还没有窗口时，先切到它的工作区，新窗口直接开在那里
+# （见 aero-helper app-watch）。它启动时读规则，所以每次都重启
+pkill -f "^$HELPER app-watch" 2>/dev/null
+"$AERO" helper >/dev/null 2>&1   # 需要时编译
+"$HELPER" app-watch "$AERO" >/dev/null 2>&1 &
 
 # 开机后 5 分钟内启动时，对已经打开的窗口也执行一遍规则：登录时恢复的窗口常常全挤在一个桌面上。
 # 其他时候（手动重启 yabai、aero reload）不执行，不把你手动挪过的窗口拉回规则指定的工作区
