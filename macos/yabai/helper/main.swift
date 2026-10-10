@@ -24,6 +24,8 @@
 //   aero-helper option-fn <命令>
 //       常驻：按住 ⌥ 时按下 🌐/fn（外接键盘上 Caps Lock 改成了它）或 Caps Lock，就用 /bin/sh 执行命令。
 //       skhd 绑不了修饰键，⌥ + Caps Lock 靠这个（yabairc 启动）。
+//   aero-helper app-watch <aero 的路径>
+//       常驻（yabairc 在登记完规则后启动）：有固定工作区的应用一被激活、而它还没有窗口，就先切到它的工作区（见"先切过去"）。
 //   aero-helper date <模板>
 //       按系统的语言和地区格式化当前时间（DateFormatter 模板，如 MMMdEEEHm → 10月7日 週三 13:55）。
 //   aero-helper input-source
@@ -142,6 +144,63 @@ func defaultBrowser() -> (bundle: String, pids: [pid_t])? {
     guard let url = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!),
           let bundle = Bundle(url: url)?.bundleIdentifier else { return nil }
     return (bundle, NSRunningApplication.runningApplications(withBundleIdentifier: bundle).map(\.processIdentifier))
+}
+
+// MARK: - 先切过去
+
+/// yabai 规则里带工作区号、按应用名匹配的（Edge → 1 等）：应用名的正则和工作区号
+func fixedWorkspaces() -> [(app: NSRegularExpression, space: Int)] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/yabai")
+    process.arguments = ["-m", "rule", "--list"]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = FileHandle.nullDevice
+    guard (try? process.run()) != nil else { return [] }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    let rules = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
+    return rules.compactMap { rule in
+        guard let space = rule["space"] as? Int, space > 0, (rule["title"] as? String ?? "").isEmpty,
+              let app = rule["app"] as? String, let regex = try? NSRegularExpression(pattern: app) else { return nil }
+        return (regex, space)
+    }
+}
+
+/// 这个进程有没有摆出来的普通大小的窗口（在哪个桌面上都算；收起来的、最小化的不算）
+func hasWindows(_ pid: pid_t) -> Bool {
+    let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    let ids = info.compactMap { window -> UInt32? in
+        guard window[kCGWindowOwnerPID as String] as? pid_t == pid, window[kCGWindowLayer as String] as? Int == 0,
+              let dict = window[kCGWindowBounds as String] as? NSDictionary,
+              let bounds = CGRect(dictionaryRepresentation: dict as CFDictionary),
+              bounds.width >= 100, bounds.height >= 100 else { return nil }
+        return window[kCGWindowNumber as String] as? UInt32
+    }
+    return ids.count > orderedOut(ids).count
+}
+
+/// 从程序坞点开 Edge 时，窗口先在当前桌面上冒出来，被规则挪到工作区 1，再跟过去，看着闪一下。
+/// 所以有固定工作区的应用一被激活、而它还没有窗口（刚启动，或者开着但窗口都关了，下一步就要开新窗口），
+/// 就马上切到它的工作区，新窗口直接开在那里。系统的激活通知比窗口早得多（Edge 从程序坞启动时早 1.7 秒）；
+/// yabai 的 application_activated 信号对还没启动完的应用要等它启动完才来，比窗口还晚，所以在这里听。
+/// 规则启动时读一次，yabairc 每次都重启它
+func watchAppActivation(aero: String) -> Never {
+    let workspaces = fixedWorkspaces()
+    NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                                      object: nil, queue: .main) { note in
+        guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              let name = app.localizedName,
+              let space = workspaces.first(where: {
+                  $0.app.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil })?.space,
+              !hasWindows(app.processIdentifier) else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: aero)
+        process.arguments = ["workspace", String(space)]
+        try? process.run()
+    }
+    RunLoop.main.run()
+    exit(0)
 }
 
 // MARK: - ⌥ + Caps Lock
@@ -657,6 +716,9 @@ case "option-fn":
     let command = arguments.dropFirst().joined(separator: " ")
     guard !command.isEmpty else { exit(2) }
     watchOptionFn(command: command)
+case "app-watch":
+    guard let aero = arguments.dropFirst().first else { exit(2) }
+    watchAppActivation(aero: aero)
 case "date":
     let formatter = DateFormatter()
     formatter.locale = Locale.current   // 系统设置里的语言和地区，不受 LANG 影响
@@ -684,6 +746,6 @@ case "switcher":
     app.delegate = switcher
     app.run()
 default:
-    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | app-names <bundle id> | default-browser | option-fn <命令> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
+    FileHandle.standardError.write("用法：aero-helper step left|right | wait-release <修饰键> <秒> | native-hotkeys on|off | switcher [选项] | app-names <bundle id> | default-browser | option-fn <命令> | app-watch <aero> | date <模板> | input-source | ordered-out <窗口id>... | bar-stats [秒] | bar-backdrop | lock\n".data(using: .utf8)!)
     exit(2)
 }
