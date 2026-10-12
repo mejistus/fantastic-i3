@@ -13,6 +13,15 @@ alt - 8 : yabai -m space --focus 8
 alt - 9 : yabai -m space --focus 9
 alt - 0 : yabai -m space --focus 10
 
+# ⌥Z ⌥X ⌥C ⌥B ⌥N ⌥M ⌥T = 工作区 Z X C B N M T（桌面 11 … 17，aero spaces 贴的标签）
+alt - z : yabai -m space --focus Z
+alt - x : yabai -m space --focus X
+alt - c : yabai -m space --focus C
+alt - b : yabai -m space --focus B
+alt - n : yabai -m space --focus N
+alt - m : yabai -m space --focus M
+alt - t : yabai -m space --focus T
+
 # workspace next / prev（⌃H ⌃L，或 ⌃⌥← ⌃⌥→）
 ctrl - l           : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace next
 ctrl - h           : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace prev

@@ -11,8 +11,12 @@
 #   aero toggle-float                                        ⌥⇧F：当前窗口在平铺 / 浮动之间切换
 #   aero toggle-space-float                                  service 模式的 f：当前工作区的窗口全部平铺 / 全部浮动
 #   aero ensure-focus                                        切桌面后焦点不在这个桌面的窗口上时补一下（space_changed 信号调）
+#   aero toggle-bar                                          ⌥⇧↩：临时关掉 SketchyBar、换回常显的系统菜单栏 / 换回来
+#   aero remember-layout                                     ⌃S M：记住当前应用的布局（平铺 / 浮动），以后新开的窗口都这样
+#   aero remember-workspace                                  ⌃S W：记住当前应用的工作区，以后新开的窗口都去那里
+#   aero remembered-rules                                    把记住的布局和工作区登记成 yabai 规则（yabairc 调）
 #   aero follow window <窗口 id> <工作区> | app <pid>         有固定工作区的应用：跟过去（yabairc 里 follow 的信号调）
-#   aero app-workspace <应用名>...                           应用固定的工作区（yabairc 里带工作区号的规则），没有就不输出
+#   aero app-workspace <应用名>...                           应用固定的工作区（yabairc 里带工作区号的规则、⌃S W 记住的），没有就不输出
 #   aero focus-window <窗口 id>                              聚焦窗口（在别的桌面就先切过去）
 #   aero mru-push <窗口 id>                                  记录窗口使用顺序（给 ⌥⇥ 窗口切换器用）
 #   aero helper <…>                                          运行 aero-helper（需要时自动编译）
@@ -23,9 +27,11 @@
 #   aero status                                              查看当前状态
 #   aero log <消息>                                          写一行到 /tmp/yabai-aero-$USER/aero.log（排查用）
 #
-# 工作区 = macOS 桌面，编号 1-10 就是调度中心里的第 1-10 个桌面（⌥1…⌥9 ⌥0）。
-# 以后要加带名字的工作区，把名字加进 WORKSPACES，并在 KEY_ASCII / KEY_CODE / KEY_NAME 里补上按键：
+# 工作区 = macOS 桌面：1-10 是调度中心里的第 1-10 个桌面（⌥1…⌥9 ⌥0），Z X C B N M 是第 11-16 个
+# （⌥Z … ⌥M，键盘最下面一排的顺序），T 是第 17 个（⌥T，后加的，排在最后，前面的桌面不用挪）。
 # 非数字的名字会自动贴成 yabai 标签。
+# 改名字或加减工作区：改 WORKSPACES，在 KEY_ASCII / KEY_CODE / KEY_NAME 里对上按键，运行 aero keys <sa|native> --force；
+# 再改 ../skhd 里的绑定和 SketchyBar 的工作区。没有 SA 时只有前 16 个能用快捷键切：macOS 只有"切换到桌面 1-16"。
 #
 # 桌面快捷键（⌥1…⌥0、⌃H ⌃L）有两种模式，yabai 启动时按 SA 是否加载成功自动选择：
 #   sa     —— 已加载 yabai 脚本扩展（SA）：由 skhd 调 yabai，瞬间切换、没有动画；
@@ -41,12 +47,12 @@ KEYS_LINK="$HOME/.config/skhd/workspaces.skhdrc"
 STATE="/tmp/yabai-aero-$USER"
 mkdir -p "$STATE"
 
-WORKSPACES=(1 2 3 4 5 6 7 8 9 10)
-PERSISTENT=${#WORKSPACES[@]}                    # ⌃H/⌃L 经过所有工作区，与 macOS 自带的一致
-# 第 i 个工作区的 macOS "切换到桌面 i" 快捷键 = ⌥ + 该键（ASCII 码 / 虚拟键码）：⌥1 … ⌥9 ⌥0
-KEY_ASCII=(49 50 51 52 53 54 55 56 57 48)
-KEY_CODE=(18 19 20 21 23 22 26 28 25 29)
-KEY_NAME=(1 2 3 4 5 6 7 8 9 0)                  # 同一个键在 skhd 里的写法
+WORKSPACES=(1 2 3 4 5 6 7 8 9 10 Z X C B N M T)
+PERSISTENT=10                                   # ⌃H/⌃L 总是经过 1-10；字母工作区和顶栏一样，有窗口时才算
+# 第 i 个工作区的 macOS "切换到桌面 i" 快捷键 = ⌥ + 该键（ASCII 码 / 虚拟键码）：⌥1 … ⌥9 ⌥0 ⌥Z … ⌥M ⌥T
+KEY_ASCII=(49 50 51 52 53 54 55 56 57 48 122 120 99 98 110 109 116)
+KEY_CODE=(18 19 20 21 23 22 26 28 25 29 6 7 8 11 45 46 17)
+KEY_NAME=(1 2 3 4 5 6 7 8 9 0 z x c b n m t)    # 同一个键在 skhd 里的写法
 MAX_DESKTOP_HOTKEYS=16                          # 系统快捷键 118-133 = 切换到桌面 1-16
 OPTION=524288
 CONTROL=262144
@@ -131,13 +137,13 @@ workspace_focus() {
     # 没有 SA：按一下 macOS 的"切换到桌面 N"快捷键，然后等切换动画结束
     local idx
     idx=$(space_index "$1")
-    [ -n "$idx" ] && [ "$idx" -le ${#WORKSPACES[@]} ] || return 1
+    [ -n "$idx" ] && [ "$idx" -le ${#WORKSPACES[@]} ] && [ "$idx" -le $MAX_DESKTOP_HOTKEYS ] || return 1
     [ "$(current_space)" = "$idx" ] && return 0
     press_desktop_key "${KEY_NAME[idx - 1]}" || return 1
     wait_for_space "$idx"
 }
 
-# AeroSpace 的 next/prev：当前显示器上"存在"的工作区（持久的 1-5、有窗口的、当前的），按顺序，不循环
+# AeroSpace 的 next/prev：当前显示器上"存在"的工作区（持久的 1-10、有窗口的、当前的），按顺序，不循环
 workspace_step() {
     # 没有 SA：交给 macOS 的"向左/右移动一个桌面"（⌃⌥←/→）
     if [ "$(keys_mode)" != sa ]; then
@@ -443,8 +449,108 @@ cmd_toggle_space_float() {
     return 0
 }
 
-# 切桌面之后（⌥N、⌃H/⌃L、触控板、调度中心……）macOS 常常再激活一下别的应用（这个桌面上次用的，
-# 没有就是 Finder，也就是桌面本身），焦点就不在这个桌面的窗口上：窗口看得见，⌥⇧F、换位置之类却找不到它。
+# ⌥⇧↩：临时关掉 SketchyBar，换回常显的系统菜单栏（装 SketchyBar 之前的样子）；再按一次换回来，菜单栏又自动隐藏。
+# 底板（aero-helper bar-backdrop）收到 SIGUSR1 马上跟着藏 / 出来。栏藏起来时 yabai 不再给它留位置，
+# 常显的系统菜单栏 yabai 自己会让开（yabairc 里照栏现在的样子设）。SketchyBar 重载后栏总是显示的，
+# sketchybarrc 会把菜单栏改回自动隐藏
+cmd_toggle_bar() {
+    command -v sketchybar >/dev/null 2>&1 || return 1
+    local bar
+    sketchybar --bar hidden=toggle
+    bar=$(sketchybar --query bar) || return 1
+    pkill -USR1 -f "^$HELPER bar-backdrop"
+    # 先改菜单栏、再改 external_bar：yabai 重新排窗口时照的是改好的菜单栏
+    if [ "$(jq -r .hidden <<<"$bar")" = on ]; then
+        helper menubar-autohide off
+        yabai -m config external_bar all:0:0
+    else
+        helper menubar-autohide on
+        yabai -m config external_bar "all:$(jq -r .height <<<"$bar"):0"
+    fi
+}
+
+# ⌃S M / ⌃S W（service 模式的 m / w）：记住当前应用的布局 / 工作区，以后它新开的窗口都这样。
+#   布局：平铺的只管普通窗口（对话框、弹窗照常浮动），浮动的管所有窗口。
+#   工作区：普通窗口都开到那里，人跟过去（follow window）；它被激活、还没有窗口时先切过去（aero-helper app-watch，
+#     收到 SIGUSR1 重新读规则）；⌥⇥ / ⌘⇥ 列表里选它也先切过去（app-workspace）。记的是工作区的名字（3、Z……），
+#     不是桌面编号：桌面增减后编号会变，reload 时按名字重新找。
+# 记在 $MEMORY 下的 layouts / workspaces（每行：应用名 TAB 值；删掉一行再 reload（⌃S Esc）就忘了），马上登记成带标签的 yabai 规则
+# （同一个标签再登记会替换掉旧的）；yabairc 每次启动时在所有规则后面再登记一遍（remembered-rules）。
+# yabai 的规则后登记的盖过先登记的，所以记住的盖过 yabairc 里写死的（Edge → 1 等）
+MEMORY="$HOME/.config/fantastic-i3"
+
+app_regex() { # <应用名>：只匹配这个名字的正则
+    printf '^%s$' "$(sed 's/[][\.*^$+?(){}|]/\\&/g' <<<"$1")"
+}
+
+layout_rule() { # <应用名> <tile|float>
+    case $2 in
+        tile) yabai -m rule --add label="layout:$1" app="$(app_regex "$1")" subrole='^AXStandardWindow$' manage=on ;;
+        float) yabai -m rule --add label="layout:$1" app="$(app_regex "$1")" manage=off ;;
+    esac
+}
+
+workspace_rule() { # <应用名> <工作区>：工作区对应的桌面不存在就不登记
+    local idx
+    idx=$(space_index "$2")
+    [ -n "$idx" ] || return 0
+    yabai -m rule --add label="workspace:$1" app="$(app_regex "$1")" subrole='^AXStandardWindow$' space="$idx"
+    yabai -m signal --add label="workspace:$1" event=window_created app="$(app_regex "$1")" \
+        action="$HERE/aero follow window \$YABAI_WINDOW_ID $idx"
+}
+
+remember() { # <文件> <应用名> <值>：替换掉这个应用原来的那一行
+    local f="$MEMORY/$1"
+    mkdir -p "$MEMORY"
+    { awk -F '\t' -v app="$2" '$1 != app' "$f" 2>/dev/null; printf '%s\t%s\n' "$2" "$3"; } >"$f.$$" && mv "$f.$$" "$f"
+}
+
+focused_window_json() {
+    local id
+    id=$(focused_window)
+    [ -n "$id" ] && yabai -m query --windows --window "$id" 2>/dev/null && return 0
+    notify "当前桌面上没有窗口，什么都没记"
+    return 1
+}
+
+cmd_remember_layout() {
+    local win app mode
+    win=$(focused_window_json) || return 1
+    app=$(jq -r .app <<<"$win")
+    if [ "$(jq -r '."is-floating"' <<<"$win")" = true ]; then mode=float; else mode=tile; fi
+    remember layouts "$app" "$mode"
+    layout_rule "$app" "$mode"
+    log "remember-layout: $app → $mode"
+    if [ "$mode" = tile ]; then notify "记住了：$app 以后新开的窗口平铺"; else notify "记住了：$app 以后新开的窗口浮动"; fi
+}
+
+cmd_remember_workspace() {
+    local win app ws
+    win=$(focused_window_json) || return 1
+    app=$(jq -r .app <<<"$win")
+    ws=$(yabai -m query --spaces --space "$(jq -r .space <<<"$win")" | jq -r 'if .label != "" then .label else .index end')
+    remember workspaces "$app" "$ws"
+    workspace_rule "$app" "$ws"
+    pkill -USR1 -f "^$HELPER app-watch"
+    log "remember-workspace: $app → $ws"
+    notify "记住了：$app 以后新开的窗口去工作区 $ws"
+}
+
+cmd_remembered_rules() {
+    local app value
+    if [ -f "$MEMORY/layouts" ]; then
+        while IFS=$'\t' read -r app value; do
+            [ -n "$app" ] && layout_rule "$app" "$value"
+        done <"$MEMORY/layouts"
+    fi
+    if [ -f "$MEMORY/workspaces" ]; then
+        while IFS=$'\t' read -r app value; do
+            [ -n "$app" ] && workspace_rule "$app" "$value"
+        done <"$MEMORY/workspaces"
+    fi
+    return 0
+}
+
 # 有固定工作区的应用（yabairc 里的 follow：Edge、终端、微信）跟过去：
 #   window <id> <工作区>：新窗口被规则挪到它的工作区（规则只挪不跟），就跟过去——只要这个应用在前台，或者是刚启动的
 #     （从程序坞启动时，窗口一被挪走，macOS 就把前台还给了当前桌面上的应用）。开机恢复的窗口、后台弹出的窗口不拽人。
@@ -492,12 +598,15 @@ cmd_follow() {
     return 0
 }
 
+# 有好几条规则时用最后一条：yabai 也是后登记的盖过先登记的（⌃S W 记住的排在最后）
 cmd_app_workspace() {
     [ $# -gt 0 ] || return 1
     yabai -m rule --list | jq -r '[.[] | select(.space > 0 and .title == "") as $rule
-        | $ARGS.positional[] | select(test($rule.app)) | $rule.space] | first // empty' --args "$@"
+        | $ARGS.positional[] | select(test($rule.app)) | $rule.space] | last // empty' --args "$@"
 }
 
+# 切桌面之后（⌥N、⌃H/⌃L、触控板、调度中心……）macOS 常常再激活一下别的应用（这个桌面上次用的，
+# 没有就是 Finder，也就是桌面本身），焦点就不在这个桌面的窗口上：窗口看得见，⌥⇧F、换位置之类却找不到它。
 # yabai 的 space_changed 信号调这里：0.6 秒内焦点不在这个桌面的窗口上，就聚焦这个桌面上最近用过的窗口。
 # aero focus-window（⌥⇥ / ⌘⇥ 等）引起的切换它自己会盯，这里不插手（见 focus_pending）。
 cmd_ensure_focus() {
@@ -564,6 +673,7 @@ cmd_keys() { # <auto|sa|native> [--force]（改了 WORKSPACES / 按键后用 --f
     local enabled=true i
     [ "$want" = sa ] && enabled=false
     for i in "${!WORKSPACES[@]}"; do
+        [ "$i" -lt $MAX_DESKTOP_HOTKEYS ] || break   # 再往后的 id 是别的快捷键
         set_hotkey $((118 + i)) $enabled "${KEY_ASCII[i]}" "${KEY_CODE[i]}" $OPTION  # 切换到桌面 i+1
     done
     for ((i = ${#WORKSPACES[@]}; i < MAX_DESKTOP_HOTKEYS; i++)); do
@@ -585,8 +695,12 @@ cmd_spaces() {
     local n=${#WORKSPACES[@]} have i idx label
     have=$(yabai -m query --spaces | jq '[.[] | select(."is-native-fullscreen" | not)] | length')
     if [ "$(keys_mode)" = sa ]; then
-        while [ "$have" -lt "$n" ]; do
-            yabai -m space --create 2>/dev/null || break
+        # 新桌面加在桌面 1 所在的显示器上。别的显示器至少各有一个自己的桌面、排在后面：多建几个，让工作区都在这块屏上
+        local display extra
+        display=$(yabai -m query --spaces --space 1 | jq -r .display)
+        extra=$(($(yabai -m query --displays | jq length) - 1))
+        while [ "$have" -lt $((n + extra)) ]; do
+            yabai -m space --create "$display" 2>/dev/null || break
             have=$((have + 1))
         done
     elif [ "$have" -lt "$n" ] && [ ! -f "$STATE/notified-spaces" ]; then
@@ -634,6 +748,10 @@ case ${1:-} in
     toggle-space-float) cmd_toggle_space_float ;;
     ensure-focus) cmd_ensure_focus ;;
     follow) shift; cmd_follow "$@" ;;
+    toggle-bar) cmd_toggle_bar ;;
+    remember-layout) cmd_remember_layout ;;
+    remember-workspace) cmd_remember_workspace ;;
+    remembered-rules) cmd_remembered_rules ;;
     app-workspace) shift; cmd_app_workspace "$@" ;;
     focus-window) shift; cmd_focus_window "$@" ;;
     helper) shift; helper "$@" ;;
@@ -644,5 +762,5 @@ case ${1:-} in
     spaces) cmd_spaces ;;
     spaces-changed) cmd_spaces_changed ;;
     status) cmd_status ;;
-    *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) awk 'NR > 1 && /^#$/ && ++blank == 2 { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 1 ;;
 esac

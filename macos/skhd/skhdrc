@@ -1,7 +1,7 @@
 # skhd 快捷键 —— 与 aerospace.toml 的 [mode.*.binding] 一一对应（yabai 版）
 # 链接到 ~/.config/skhd/skhdrc；aero 是 ../yabai/aero，用来模拟 AeroSpace 的命令。
 #
-# 切换工作区（⌥1 … ⌥9 ⌥0 = 工作区 1 … 10）和 ⌃H/⌃L 在文件末尾 .load 的 workspaces.skhdrc 里：
+# 切换工作区（⌥1 … ⌥9 ⌥0 = 工作区 1 … 10，⌥Z ⌥X ⌥C ⌥B ⌥N ⌥M ⌥T = 工作区 Z X C B N M T）和 ⌃H/⌃L 在文件末尾 .load 的 workspaces.skhdrc 里：
 # 它由 aero keys 按 SA 是否可用，链接到 workspaces-sa.skhdrc 或 workspaces-native.skhdrc。
 
 # 进入每个模式时通知 SketchyBar 顶栏显示 / 隐藏 RESIZE、SERVICE（没装 SketchyBar 也不影响）
@@ -51,6 +51,14 @@ alt + shift - 7 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-wor
 alt + shift - 8 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 8 --focus-follows-window
 alt + shift - 9 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 9 --focus-follows-window
 alt + shift - 0 : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace 10 --focus-follows-window
+# ⌥⇧Z ⌥⇧X ⌥⇧C ⌥⇧B ⌥⇧N ⌥⇧M ⌥⇧T：移到工作区 Z X C B N M T（桌面 11 … 17）
+alt + shift - z : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace Z --focus-follows-window
+alt + shift - x : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace X --focus-follows-window
+alt + shift - c : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace C --focus-follows-window
+alt + shift - b : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace B --focus-follows-window
+alt + shift - n : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace N --focus-follows-window
+alt + shift - m : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace M --focus-follows-window
+alt + shift - t : $HOME/Documents/fantastic-i3/macos/yabai/aero move-node-to-workspace T --focus-follows-window
 
 # move-workspace-to-monitor --wrap-around next
 alt + shift - tab : $HOME/Documents/fantastic-i3/macos/yabai/aero move-workspace-to-monitor --wrap-around next
@@ -67,14 +75,12 @@ cmd - space : $HOME/Documents/fantastic-i3/macos/window_switcher --apps --list
     "aero-helper"
 ]
 
+# ⌥⇧↩：临时关掉顶上的 SketchyBar 栏，换回常显的系统菜单栏；再按一次换回来
+alt + shift - return : $HOME/Documents/fantastic-i3/macos/yabai/aero toggle-bar
+
 # 当前工作区开 Finder
 alt - d   : $HOME/Documents/fantastic-i3/macos/new_window_here
 
-# 工作区别名（用 aero workspace，有没有 SA 都能用）：⌥B = ⌥4，⌥T = ⌥5，⌥Z = ⌥8，⌥C = ⌥9
-alt - b : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 4
-alt - t : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 5
-alt - z : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 8
-alt - c : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace 9
 # ⌥G = 工作区 1 的默认浏览器：那里有它的窗口就切过去，没有就切到工作区 1 新开一个
 alt - g : $HOME/Documents/fantastic-i3/macos/yabai/focus_browser
 # ⌥ + Caps Lock = ⌥0（工作区 10）：skhd 绑不了 Caps Lock（外接键盘上改成了 🌐/fn），
@@ -94,6 +100,12 @@ service < space  ; default
 service < j      : yabai -m window --toggle split; skhd -k "f20"
 service < h      : yabai -m window --insert east; skhd -k "f20"
 service < v      : yabai -m window --insert south; skhd -k "f20"
+# ⌃S M：记住当前应用的布局（平铺 / 浮动），以后它新开的窗口都这样（按着 ⌃ 按 M 也行）
+service < m        : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero remember-layout
+service < ctrl - m : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero remember-layout
+# ⌃S W：记住当前应用的工作区，以后它新开的窗口都去那里（盖过 yabairc 里写死的）
+service < w        : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero remember-workspace
+service < ctrl - w : skhd -k "f20"; $HOME/Documents/fantastic-i3/macos/yabai/aero remember-workspace
 service < f20    ; default
 
 # ================================================================ mode.resize

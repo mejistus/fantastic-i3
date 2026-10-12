@@ -8,6 +8,8 @@
 //   aero-helper native-hotkeys on|off
 //       打开 / 关闭 macOS 自带的 ⌘⇥ / ⌘⇧⇥ 应用切换器和 Spotlight 的 ⌘Space（关掉后这几个键才能交给 skhd）。
 //       效果持续到重新登录。yabairc 每次启动都关掉它们：⌘⇥ 和 ⌘Space 是按应用切换的列表（window_switcher --apps）。
+//   aero-helper menubar-autohide on|off
+//       系统菜单栏自动隐藏 / 常显（和系统设置里的开关一样，马上生效）。SketchyBar 在时自动隐藏，⌥⇧↩ 关掉它时常显。
 //   aero-helper switcher [--select 窗口id] [--apps | --launchpad] [--font-size N] [--width 屏幕宽度%] [--rows N]
 //       窗口切换列表。从 stdin 读 TSV：窗口id \t 桌面 \t 应用 \t 标题 \t 状态 \t pid
 //       --apps：列表末尾再加上 Dock 里亮着点、但没有窗口的应用（选中时输出 app:pid:bundle id）。
@@ -105,6 +107,31 @@ func setNativeHotkeys(_ enabled: Bool) {
     for hotKey: Int32 in [1, 2, 64] { _ = CGSSetSymbolicHotKeyEnabled(hotKey, enabled) }
 }
 
+// MARK: - 系统菜单栏自动隐藏
+
+// 系统设置里"自动隐藏和显示菜单栏"由两处组成：窗口服务器里的开关（SkyLight 的 SLSSetMenuBarAutohideEnabled，
+// yabai 照它决定给不给菜单栏留位置），和偏好里的 _HIHideMenuBar（系统设置的界面、重新登录后照它）；改完发通知，
+// 菜单栏马上照着变。只改偏好不行：菜单栏是出来了，yabai 却以为它还藏着，平铺的窗口顶上被它压住。
+// 不用 System Events 的 autohide menu bar（它两处都改）：skhd 调它时要先给 skhd"控制 System Events"的授权
+func setMenuBarAutohide(_ on: Bool) {
+    guard let skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW),
+          let get = dlsym(skyLight, "SLSGetMenuBarAutohideEnabled"),
+          let set = dlsym(skyLight, "SLSSetMenuBarAutohideEnabled") else { exit(1) }
+    typealias GetAutohide = @convention(c) (Int32, UnsafeMutablePointer<Int32>) -> Int32
+    typealias SetAutohide = @convention(c) (Int32, Bool) -> Int32
+    let key = "_HIHideMenuBar" as CFString
+    let any = kCFPreferencesAnyApplication, user = kCFPreferencesCurrentUser, host = kCFPreferencesAnyHost
+    var current: Int32 = 0
+    _ = unsafeBitCast(get, to: GetAutohide.self)(CGSMainConnectionID(), &current)
+    if (current != 0) == on && (CFPreferencesCopyValue(key, any, user, host) as? Bool ?? false) == on { return }
+    _ = unsafeBitCast(set, to: SetAutohide.self)(CGSMainConnectionID(), on)
+    CFPreferencesSetValue(key, on as CFBoolean, any, user, host)
+    CFPreferencesSynchronize(any, user, host)
+    DistributedNotificationCenter.default().postNotificationName(
+        NSNotification.Name("AppleInterfaceMenuBarHidingChangedNotification"), object: nil, userInfo: nil,
+        deliverImmediately: true)
+}
+
 // MARK: - 收起来的窗口
 
 // 应用关掉主窗口但还在后台时（腾讯会议、微信），窗口常常只是被收起来（orderOut）：窗口服务器里还在，yabai 也还把它
@@ -150,7 +177,7 @@ func defaultBrowser() -> (bundle: String, pids: [pid_t])? {
 
 // MARK: - 先切过去
 
-/// yabai 规则里带工作区号、按应用名匹配的（Edge → 1 等）：应用名的正则和工作区号
+/// yabai 规则里带工作区号、按应用名匹配的（Edge → 1、⌃S W 记住的等）：应用名的正则和工作区号，按登记的顺序
 func fixedWorkspaces() -> [(app: NSRegularExpression, space: Int)] {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/yabai")
@@ -186,14 +213,19 @@ func hasWindows(_ pid: pid_t) -> Bool {
 /// 所以有固定工作区的应用一被激活、而它还没有窗口（刚启动，或者开着但窗口都关了，下一步就要开新窗口），
 /// 就马上切到它的工作区，新窗口直接开在那里。系统的激活通知比窗口早得多（Edge 从程序坞启动时早 1.7 秒）；
 /// yabai 的 application_activated 信号对还没启动完的应用要等它启动完才来，比窗口还晚，所以在这里听。
-/// 规则启动时读一次，yabairc 每次都重启它
+/// 规则启动时读一次（yabairc 每次都重启它），⌃S W 记住新的工作区后 aero 发 SIGUSR1，再读一次。
+/// 好几条规则都匹配时用最后一条：yabai 也是后登记的盖过先登记的
 func watchAppActivation(aero: String) -> Never {
-    let workspaces = fixedWorkspaces()
+    var workspaces = fixedWorkspaces()
+    signal(SIGUSR1, SIG_IGN)
+    let reload = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+    reload.setEventHandler { workspaces = fixedWorkspaces() }
+    reload.resume()
     NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                                                       object: nil, queue: .main) { note in
         guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let name = app.localizedName,
-              let space = workspaces.first(where: {
+              let space = workspaces.last(where: {
                   $0.app.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil })?.space,
               !hasWindows(app.processIdentifier) else { return }
         let process = Process()
@@ -746,6 +778,8 @@ case "wait-release":
     exit(waitRelease(mask, timeout: timeout) ? 0 : 1)
 case "native-hotkeys":
     setNativeHotkeys(arguments.dropFirst().first == "on")
+case "menubar-autohide":
+    setMenuBarAutohide(arguments.dropFirst().first == "on")
 case "app-names":
     guard let bundle = arguments.dropFirst().first,
           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { exit(1) }

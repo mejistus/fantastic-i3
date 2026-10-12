@@ -2,7 +2,7 @@
 # SketchyBar 顶栏 —— 仿 polybar（../../polybar），替代 macOS 菜单栏（菜单栏设为自动隐藏，鼠标移到屏幕顶上才出来）。
 # 链接到 ~/.config/sketchybar。高 32、One Dark 配色、Maple Mono NF 字体，和 i3 那边一致。
 #
-#   左：苹果菜单（ ）、工作区 1-10（数字 + 上面窗口的应用图标；当前的高亮，点一下切过去）、skhd 模式、当前应用和窗口标题
+#   左：苹果菜单（ ）、工作区 1-10 和 Z X C B N M T（名字 + 上面窗口的应用图标；当前的高亮，点一下切过去）、skhd 模式、当前应用和窗口标题
 #   右：主题开关、GPU（利用率 + 占用的内存）、CPU（曲线）、内存、磁盘、网速、输入法、音量、电池、日期时间
 #
 # GPU / CPU / 内存 / 磁盘 / 网速 / 输入法由 aero-helper bar-stats 推送（../yabai/helper/main.swift）；
@@ -22,15 +22,19 @@ HELPER="$HOME/.cache/fantastic-i3/aero-helper"
 pkill -f "^$HELPER bar-stats" 2>/dev/null
 pkill -f "^$HELPER bar-backdrop" 2>/dev/null
 
-# topmost=window：栏在普通窗口之上（菜单、系统菜单栏之下）。默认的 off 会把栏放在普通窗口下面，
-# 不归 yabai 平铺的浮动窗口（闪电说、QQ 音乐、微信、访达……）放在屏幕顶上时会盖住栏的一部分。
-# 有窗口盖满整块屏时（PowerPoint 放映等），bar-backdrop 用 hidden=on 把栏藏起来（栏的 hidden 归它管）。
+# topmost=off（默认）：栏在普通窗口下面（层级 -20），和原生的自动隐藏菜单栏一样，浮动窗口放在屏幕顶上时可以盖住它；
+# 平铺的窗口有 yabai external_bar 留出的 24，碰不到它。盖满整块屏的窗口（PowerPoint 放映等）也自然把它盖住。
+# （以前是 topmost=window，栏在普通窗口之上，浮动窗口（闪电说、QQ 音乐、微信、访达……）盖不住它，和原生的不一样。）
 # 高度和系统菜单栏一样（没有刘海的屏幕上是 24）：自动隐藏的菜单栏滑下来时正好盖住这条栏。
 # 改高度时 ../yabai/yabairc 的 external_bar 跟着改。
 # 底色不用 SketchyBar 的 blur_radius（macOS 15 上没效果），而是栏下面垫一条底板（aero-helper bar-backdrop，
 # 在文件末尾启动，高度跟着栏走）：和原生菜单栏一样是壁纸大半径模糊、略微压暗后的样子。栏自己的底色是叠在上面的染色
-sketchybar --bar position=top height=24 color=$BAR_COLOR shadow=off sticky=on topmost=window \
+sketchybar --bar position=top height=24 color=$BAR_COLOR shadow=off sticky=on topmost=off \
     padding_left=8 padding_right=8 display=all font_smoothing=on
+# 重载后栏总是显示的（⌥⇧↩ 关掉的状态不保留）：系统菜单栏改回自动隐藏，让 yabai 把位置留回来，
+# 不然平铺的窗口会盖住栏（见 ../yabai/aero toggle-bar）
+[ -x "$HELPER" ] && "$HELPER" menubar-autohide on
+command -v yabai >/dev/null 2>&1 && yabai -m config external_bar all:24:0
 
 # 图标比文字大一些：和原生菜单栏比过，原生的状态图标高 12–16，Maple Mono NF 18 号的图标高 11–15（15 号时只有 9–12.5）
 sketchybar --default updates=when_shown padding_left=3 padding_right=3 \
@@ -50,10 +54,12 @@ sketchybar --add item apple left \
         background.color=$SPACE_BG background.corner_radius=6 background.height=20 background.drawing=off \
     --subscribe apple mouse.clicked
 
-# 工作区 1-10：当前的有底色、数字变蓝；有窗口的数字亮、后面跟应用图标；空的数字变暗
-for i in 1 2 3 4 5 6 7 8 9 10; do
+# 工作区 1-10、Z X C B N M T（桌面 11-17）：当前的有底色、名字变蓝；有窗口的名字亮、后面跟应用图标；空的变暗。
+# 字母工作区空着又不是当前的时候不显示（plugins/space_apps.sh）
+WORKSPACES=(1 2 3 4 5 6 7 8 9 10 Z X C B N M T)
+for i in $(seq ${#WORKSPACES[@]}); do
     sketchybar --add space space.$i left \
-        --set space.$i space=$i icon=$i \
+        --set space.$i space=$i icon=${WORKSPACES[i - 1]} \
             icon.font="$TEXT_FONT:$BOLD:13.0" icon.color=$FG_FAINT icon.highlight_color=$BAR_BLUE \
             icon.padding_left=8 icon.padding_right=6 \
             label.font="$APP_FONT:14.0" label.color=$FG_ALT label.highlight_color=$FG \
@@ -62,11 +68,12 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
             script="$PLUGINS/space.sh" \
         --subscribe space.$i mouse.clicked
 done
+sketchybar --set '/space\.1[1-7]/' drawing=off   # 字母工作区先藏着，space_apps.sh 再决定
 
 # 不显示，只负责在窗口增减、移动时刷新各工作区的应用图标
 sketchybar --add item space_apps left \
     --set space_apps drawing=off updates=on script="$PLUGINS/space_apps.sh" \
-    --subscribe space_apps space_windows_change system_woke
+    --subscribe space_apps space_windows_change space_change system_woke
 
 # skhd 模式（RESIZE / SERVICE），平时不显示
 sketchybar --add item mode left \

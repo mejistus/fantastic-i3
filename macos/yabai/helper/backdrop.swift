@@ -5,9 +5,10 @@
 // 贴上这样算出来的图（参数和截下来的原生菜单栏逐段比对过）。读不到壁纸（动态壁纸等）时退回系统的磨砂材质。
 // SketchyBar 自己的 blur_radius 用的私有接口在 macOS 15 上对它的窗口不起作用，所以不用它。
 //
-// 窗口层级 2：普通窗口（0）之上，SketchyBar 的栏（topmost=window，浮动窗口层级 3）之下。不接收鼠标。
+// 窗口层级 -21：SketchyBar 的栏（topmost=off，-20）之下，普通窗口（0）之下——和原生的自动隐藏菜单栏一样，
+// 浮动窗口可以盖住栏；平铺的窗口有 yabai 的 external_bar 留出的那一截，碰不到它。PowerPoint 放映这类盖满整块屏的窗口
+// 自然也把栏和底板一起盖住。不接收鼠标。
 // 每条只放在自己那块屏的普通桌面上，不放在原生全屏的桌面上（SketchyBar 在那上面也不画栏），见 placeOnDesktops。
-// 不走原生全屏、而是用一个窗口盖满整块屏的（PowerPoint 放映等），把栏和底板一起藏起来，见 checkCovered。
 // 每 3 秒问一次 SketchyBar 栏的高度和是否隐藏，顺便看壁纸换没换（切换桌面时也看，每个桌面可以有不同的壁纸）。
 // 问不到时看 SketchyBar 的进程还在不在，不在了才退出：刚启动时它往往还在执行 sketchybarrc，睡眠唤醒后也要重建栏，
 // 这些时候都问不到（之前连着问不到 3 次就退出，唤醒后底板就没了）。
@@ -41,7 +42,7 @@ final class BarBackdrop {
     var hidden = false
     var wallpapers = ""   // 各屏的位置、壁纸路径和修改时间；变了就重画
     var generation = 0    // 第几次重画：后台算得慢的旧图不要
-    var covered = false   // 有窗口盖满了某块屏，栏和底板都藏起来了（见 checkCovered）
+    var signalSource: DispatchSourceSignal?
 
     func run() {
         let app = NSApplication.shared
@@ -55,7 +56,12 @@ final class BarBackdrop {
             self?.checkWallpaper()
         }
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.sync() }
-        Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in self?.checkCovered() }.tolerance = 0.05
+        // aero toggle-bar（⌥⇧↩）藏起 / 放出栏后发 SIGUSR1：马上跟着藏 / 出来，不等 3 秒一次的检查
+        signal(SIGUSR1, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+        source.setEventHandler { [weak self] in self?.sync() }
+        source.resume()
+        signalSource = source
         app.run()
     }
 
@@ -78,15 +84,18 @@ final class BarBackdrop {
             if windows.isEmpty { height = 24; rebuild() }   // 先按 24 高建出来
             return
         }
-        // 栏藏不藏由这里管（见 checkCovered）：SketchyBar 重载过、或者上次没发成功，就再发一次
-        if ((bar["hidden"] as? String) == "on") != covered { hideBar() }
         let newHeight = CGFloat((bar["height"] as? NSNumber)?.doubleValue ?? 24)
-        let newHidden = (bar["position"] as? String) == "bottom"
-        if newHeight != height || newHidden != hidden || windows.isEmpty {
+        let newHidden = (bar["hidden"] as? String) == "on" || (bar["position"] as? String) == "bottom"
+        if newHeight != height || windows.isEmpty {
             height = newHeight
             hidden = newHidden
             rebuild()
         } else {
+            // 藏起来只是变透明，窗口和图都留着：放出来时马上就是原样，不用重新建、等模糊图算好
+            if newHidden != hidden {
+                hidden = newHidden
+                for window in windows.values { window.alphaValue = hidden ? 0 : 1 }
+            }
             placeOnDesktops()
             checkWallpaper()
         }
@@ -133,57 +142,6 @@ final class BarBackdrop {
         })
     }
 
-    /// PowerPoint 放映（还有不走原生全屏的视频、游戏）是普通桌面上一个层级 0、盖满整块屏的窗口。SketchyBar 只在原生全屏的
-    /// 桌面上藏栏，管不到这种；栏和底板又都在普通窗口之上，就压在放映的画面上。这时把两者都藏起来（hidden=on，底板透明）。
-    /// SketchyBar 从命令行只能所有屏一起藏，所以另一块屏上的栏也跟着藏（放映时那块屏多半是演示者视图，本来也被盖着）。
-    /// 不用 topmost=off 降到普通窗口下面：SketchyBar 改 topmost 会拆掉重建所有栏的窗口（一个图标一个窗口），
-    /// 图标一个接一个地消失，前后拖 0.2 秒，恢复时整条栏还要闪一下（逐帧量过）；hidden 是所有窗口同时挪走。
-    /// 每 0.2 秒看一次窗口列表（约 0.5 ms）：放映开始时程序没有切换、桌面也没变，没有通知可等
-    func checkCovered() {
-        guard coveredByWindow() != covered else { return }
-        covered.toggle()
-        logLine(covered ? "bar-backdrop：有窗口盖满了屏幕，藏起栏" : "bar-backdrop：栏回来")
-        hideBar()
-    }
-
-    /// 栏按 covered 藏起来或放出来，SketchyBar 照做了再藏 / 放底板：两者一起消失、一起出现
-    func hideBar() {
-        let hide = covered
-        work.async { [weak self, sketchybar] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: sketchybar)
-            process.arguments = ["--bar", "hidden=\(hide ? "on" : "off")"]
-            try? process.run()
-            process.waitUntilExit()
-            DispatchQueue.main.async {
-                guard let self else { return }
-                for window in self.windows.values { window.alphaValue = self.covered ? 0 : 1 }
-            }
-        }
-    }
-
-    /// 有没有哪块屏（原生全屏的除外）最上面的普通窗口正好盖满整块屏。没开"自动隐藏程序坞"时，最大化的窗口盖不到程序坞那一截
-    func coveredByWindow() -> Bool {
-        let skip = fullscreenDisplays()
-        let displays = NSScreen.screens.compactMap(displayID).filter { !skip.contains($0) }.map(CGDisplayBounds)
-        guard !displays.isEmpty else { return false }
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-        var done = Set<Int>()   // 已经找到最上面那个窗口的屏
-        for window in info {    // 从前往后
-            guard window[kCGWindowLayer as String] as? Int == 0,
-                  (window[kCGWindowAlpha as String] as? Double ?? 1) > 0,
-                  let dict = window[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: dict as CFDictionary),
-                  bounds.width >= 100, bounds.height >= 100 else { continue }   // 不算看不见的小窗口
-            for (i, display) in displays.enumerated() where !done.contains(i) && bounds.intersects(display) {
-                if bounds.contains(display) { return true }
-                done.insert(i)
-            }
-            if done.count == displays.count { break }
-        }
-        return false
-    }
-
     /// 每条底板放到自己那块屏的所有普通桌面上，从别的桌面（原生全屏的）上拿掉。
     /// 不用"所有桌面都显示"（canJoinAllSpaces）：那样系统会把它也放到新建的全屏桌面上，进入全屏的一瞬间先画出来，
     /// 等收到切换桌面的通知再藏已经晚了约 90 ms，顶上闪一下磨砂（录屏逐帧看过）。新加的普通桌面在下次检查时补上
@@ -212,11 +170,11 @@ final class BarBackdrop {
         generation += 1
         var screens: [CGDirectDisplayID: NSScreen] = [:]
         for screen in NSScreen.screens { if let display = displayID(screen) { screens[display] = screen } }
-        for (display, window) in windows where hidden || height <= 0 || screens[display] == nil {
+        for (display, window) in windows where height <= 0 || screens[display] == nil {
             window.orderOut(nil)
             windows[display] = nil
         }
-        guard !hidden, height > 0 else { return }
+        guard height > 0 else { return }
         var jobs: [(display: CGDirectDisplayID, wallpaper: URL?, size: CGSize)] = []
         for (display, screen) in screens {
             let frame = NSRect(x: screen.frame.minX, y: screen.frame.maxY - height, width: screen.frame.width, height: height)
@@ -243,8 +201,8 @@ final class BarBackdrop {
 
     func makeWindow(_ frame: NSRect) -> NSWindow {
         let window = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.level = NSWindow.Level(rawValue: 2)
-        window.alphaValue = covered ? 0 : 1
+        window.level = NSWindow.Level(rawValue: -21)
+        window.alphaValue = hidden ? 0 : 1
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
