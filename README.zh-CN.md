@@ -63,7 +63,7 @@ Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS �
 | <kbd>⌥⇧H</kbd> <kbd>⌥⇧J</kbd> <kbd>⌥⇧K</kbd> <kbd>⌥⇧L</kbd> | 和那边的窗口交换（⌥⇧ + 方向键也行） |
 | <kbd>⌥F</kbd> / <kbd>⌥⇧F</kbd> | 全屏 / 平铺 ↔ 浮动 |
 | <kbd>⌥-</kbd> / <kbd>⌥=</kbd> | 缩小 / 放大（<kbd>⌥R</kbd>：调大小模式） |
-| <kbd>⌘⇥</kbd> | 窗口列表，打字搜索，支持拼音 |
+| <kbd>⌘⇥</kbd> | 点一下回到上一个窗口，按住弹出窗口列表（打字搜索，支持拼音） |
 | <kbd>⌥⇥</kbd> / <kbd>⌘Space</kbd> | 应用列表，启动台里的应用都在（点一下 ⌥⇥：上一个应用） |
 | <kbd>⌃S</kbd> <kbd>M</kbd> / <kbd>⌃S</kbd> <kbd>W</kbd> | 记住当前应用的布局 / 工作区 |
 | <kbd>⌃S</kbd> <kbd>Esc</kbd> | 重新加载配置 |
