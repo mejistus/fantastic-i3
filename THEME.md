@@ -60,3 +60,12 @@ i3-msg reload                  # i3 相关
 3. `~/.gtkrc-2.0` 头写着会被 nwg-look 覆盖，点了 Apply 要重改。
 4. 图标 `breeze` / 光标 `breeze_cursors` 尚未切 Tahoe（包已装），切完要重登录。
 5. 本仓库其他文件（如 ZSHRC）含私钥 token，公开前必须清理。
+
+## 顺手修掉的问题
+
+- xsettingsd 还在广播旧设置，盖过了新主题（改完要 `pkill -HUP xsettingsd`）。
+- GTK 指向不存在的 `MacTahoe-Dark`，回退成亮色 Adwaita（改用 `MacTahoe-Dark-solid`）。
+- KDE 程序经 kdeglobals 绕过 qt6ct 的图标设置。
+- qt6ct 的自定义调色板盖住了 Kvantum 的暗色。
+- 静态链接 Qt 的程序（微信）改不了主题，记为不可美化。
+- fcitx5 原版 wechat-dark 菜单不可读：自制 `wechat-dark-menu`（微信面板 + 暗色菜单）。

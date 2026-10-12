@@ -1,3 +1,6 @@
 [submodule "nextvim"]
 	path = nextvim
 	url = https://github.com/mejistus/NextVim.git
+[submodule "macos"]
+	path = macos
+	url = https://github.com/mejistus/fantastic-i3-macOS.git
