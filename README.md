@@ -62,12 +62,13 @@ It's safe to rerun. At the end it lists what's left to do by hand and prints a k
 | <kbd>⌥⇧H</kbd> <kbd>⌥⇧J</kbd> <kbd>⌥⇧K</kbd> <kbd>⌥⇧L</kbd> | Swap with the window there (or ⌥⇧ + arrows) |
 | <kbd>⌥F</kbd> / <kbd>⌥⇧F</kbd> | Fullscreen / tile ↔ float |
 | <kbd>⌥-</kbd> / <kbd>⌥=</kbd> | Shrink / grow (<kbd>⌥R</kbd>: resize mode) |
-| <kbd>⌥⇥</kbd> | Window list. Type to search, pinyin too |
-| <kbd>⌘⇥</kbd> / <kbd>⌘Space</kbd> | App list with every Launchpad app |
+| <kbd>⌘⇥</kbd> | Window list. Type to search, pinyin too |
+| <kbd>⌥⇥</kbd> / <kbd>⌘Space</kbd> | App list with every Launchpad app (tap ⌥⇥: previous app) |
 | <kbd>⌃S</kbd> <kbd>M</kbd> / <kbd>⌃S</kbd> <kbd>W</kbd> | Remember the app's layout / workspace |
 | <kbd>⌃S</kbd> <kbd>Esc</kbd> | Reload the config |
 | <kbd>⌥⇧↩</kbd> | Switch between the top bar and the macOS menu bar |
-| <kbd>⌥D</kbd> / <kbd>⌥G</kbd> | Finder here / browser on workspace 1 |
+| <kbd>⌥D</kbd> / <kbd>⌥⇧D</kbd> | Finder here / Documents in a new Finder window |
+| <kbd>⌥G</kbd> | Browser on workspace 1 |
 
 All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS)**.
 
