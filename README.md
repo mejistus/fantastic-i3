@@ -66,7 +66,7 @@ It's safe to rerun. At the end it lists what's left to do by hand and prints a k
 | <kbd>⌘⇥</kbd> / <kbd>⌘Space</kbd> | App list with every Launchpad app |
 | <kbd>⌃S</kbd> <kbd>M</kbd> / <kbd>⌃S</kbd> <kbd>W</kbd> | Remember the app's layout / workspace |
 | <kbd>⌃S</kbd> <kbd>Esc</kbd> | Reload the config |
-| <kbd>⌥⇧↩</kbd> | Swap the top bar for the macOS menu bar |
+| <kbd>⌥⇧↩</kbd> | Switch between the top bar and the macOS menu bar |
 | <kbd>⌥D</kbd> / <kbd>⌥G</kbd> | Finder here / browser on workspace 1 |
 
 All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS)**.

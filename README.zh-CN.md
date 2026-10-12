@@ -66,7 +66,7 @@ Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS �
 | <kbd>⌘⇥</kbd> / <kbd>⌘Space</kbd> | 应用列表，启动台里的应用都在 |
 | <kbd>⌃S</kbd> <kbd>M</kbd> / <kbd>⌃S</kbd> <kbd>W</kbd> | 记住当前应用的布局 / 工作区 |
 | <kbd>⌃S</kbd> <kbd>Esc</kbd> | 重新加载配置 |
-| <kbd>⌥⇧↩</kbd> | 顶栏换回系统菜单栏 |
+| <kbd>⌥⇧↩</kbd> | 在顶栏和系统菜单栏之间切换 |
 | <kbd>⌥D</kbd> / <kbd>⌥G</kbd> | 在这里开 Finder / 工作区 1 的浏览器 |
 
 全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)**。
