@@ -69,6 +69,7 @@ Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS �
 | <kbd>⌥⇧↩</kbd> | 在顶栏和系统菜单栏之间切换 |
 | <kbd>⌥D</kbd> / <kbd>⌥⇧D</kbd> | 在这里开 Finder / 新开 Finder 窗口打开文稿 |
 | <kbd>⌥G</kbd> | 工作区 1 的浏览器 |
+| <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | 截图识字 / 截图识公式（LaTeX），复制到剪贴板 |
 
 全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)**。
 

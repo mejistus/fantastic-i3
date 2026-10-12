@@ -69,6 +69,7 @@ It's safe to rerun. At the end it lists what's left to do by hand and prints a k
 | <kbd>⌥⇧↩</kbd> | Switch between the top bar and the macOS menu bar |
 | <kbd>⌥D</kbd> / <kbd>⌥⇧D</kbd> | Finder here / Documents in a new Finder window |
 | <kbd>⌥G</kbd> | Browser on workspace 1 |
+| <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | Screenshot → text / LaTeX formula, copied |
 
 All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS)**.
 
