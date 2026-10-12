@@ -38,6 +38,7 @@ i3 on X11 with polybar, rofi, kitty, picom, dunst, conky and NvChad, all in one 
 - **Theme**: GTK 2/3/4, Qt 5/6, fcitx5 and rofi in MacTahoe dark. `install.sh` installs the packages (Arch, yay). The file map, reload steps and pitfalls are in [THEME.md](THEME.md).
 - **Polybar**: several styles. `python ~/.config/polybar/scripts/change.py --select 2` switches to #2, which has a CPU monitor.
 - **Neovim**: [NvChad](https://nvchad.com/) with my mappings in `nvim/lua/mappings.lua`. Pair it with qutebrowser to spare your mouse and neck. Code hover is on `F`: press ⇧F twice to look up. OneDark matches the rest of the theme; I use Dracula.
+- **tmux**: `tmux/tmux.conf`, shared with macOS (the macOS installer links it to `~/.config/tmux`). Mouse on, status line at the bottom, Alt + number jumps to that window.
 - **Also**: conky from [slate-conky-theme](https://github.com/CrispyKSP/slate-conky-theme). For the login screen, [slick-greeter](https://github.com/linuxmint/slick-greeter) is worth a look.
 
 ## macOS: yabai

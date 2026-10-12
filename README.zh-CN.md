@@ -38,6 +38,7 @@ X11 上的 i3，配 polybar、rofi、kitty、picom、dunst、conky 和 NvChad，
 - **主题**：GTK 2/3/4、Qt 5/6、fcitx5、rofi 统一成 MacTahoe 深色。`install.sh` 装依赖（Arch，用 yay）。文件放哪、改完怎么重载、踩过的坑见 [THEME.md](THEME.md)。
 - **Polybar**：有好几种样式。`python ~/.config/polybar/scripts/change.py --select 2` 换成带 CPU 监视的 2 号。
 - **Neovim**：基于 [NvChad](https://nvchad.com/)，键位改在 `nvim/lua/mappings.lua`。配合 qutebrowser，手不用碰鼠标，脖子也轻松。代码悬浮提示在 `F` 上：按两次 ⇧F 查看。和整体主题最搭的是 OneDark；我自己用 Dracula。
+- **tmux**：`tmux/tmux.conf`，和 macOS 共用一份（macOS 的安装脚本把它链接到 `~/.config/tmux`）。鼠标可用，状态栏在底部，⌥ + 数字直接跳到同号窗口。
 - **其它**：conky 来自 [slate-conky-theme](https://github.com/CrispyKSP/slate-conky-theme)。登录界面可以试试 [slick-greeter](https://github.com/linuxmint/slick-greeter)。
 
 ## macOS: yabai
