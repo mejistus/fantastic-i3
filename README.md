@@ -44,7 +44,7 @@ i3 on X11 with polybar, rofi, kitty, picom, dunst, conky and NvChad, all in one 
 
 The same habits on macOS: yabai tiles windows, skhd handles the keys and SketchyBar replaces the menu bar. There are 17 workspaces, a window switcher with pinyin search, and per-app layout and workspace memory. It lives in its own repo, [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS), included here as the `macos` submodule.
 
-On Apple Silicon, one line installs everything, Homebrew included, and clones fantastic-i3-macOS to `~/Documents/fantastic-i3-macOS`:
+On Apple Silicon, one line installs everything, Homebrew included, and clones fantastic-i3-macOS out of sight to `~/.local/share/fantastic-i3-macOS`:
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"

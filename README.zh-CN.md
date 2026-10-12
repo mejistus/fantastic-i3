@@ -44,7 +44,7 @@ X11 上的 i3，配 polybar、rofi、kitty、picom、dunst、conky 和 NvChad，
 
 在 macOS 上沿用同一套习惯：yabai 平铺窗口，skhd 管快捷键，SketchyBar 代替菜单栏。有 17 个工作区、能用拼音搜索的窗口切换器，还能按应用记住布局和工作区。它是单独的仓库 [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)，在这里是子模块 `macos`。
 
-Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS 会克隆到 `~/Documents/fantastic-i3-macOS`：
+Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS 会克隆到看不见的 `~/.local/share/fantastic-i3-macOS`：
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"
