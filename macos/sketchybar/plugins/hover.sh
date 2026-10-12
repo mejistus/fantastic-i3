@@ -9,7 +9,7 @@
 # 有自己脚本的项（音量、电池、日期）在它们的脚本里把点击转给这里。网速拆成了 net / net.rx / net.tx 三块，都按 net 处理。
 STATE="/tmp/yabai-aero-$USER"
 HELPER="$HOME/.cache/fantastic-i3/aero-helper"
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 POPUPS="gpu cpu mem disk net input volume battery clock"
 ITEM=${NAME%%.*}
 

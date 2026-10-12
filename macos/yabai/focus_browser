@@ -3,7 +3,7 @@
 #   工作区 1 上有它的窗口：切到工作区 1 并聚焦这个窗口（有好几个就用最近用过的）；
 #   没有：切到工作区 1，在那里新开一个浏览器窗口（浏览器在别的工作区的窗口不动）。
 export PATH=/opt/homebrew/bin:/usr/bin:/bin
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 WORKSPACE=1
 
 IFS=$'\t' read -r bundle pids < <("$AERO" helper default-browser)

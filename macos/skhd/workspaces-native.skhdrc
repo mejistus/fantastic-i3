@@ -4,5 +4,5 @@
 # ⌥T（工作区 T，桌面 17）没有：macOS 只有"切换到桌面 1-16"。
 # macOS 每个动作只能设一个快捷键，所以 ⌃H/⌃L 由 aero 模拟按一下 ⌃⌥←/⌃⌥→。
 
-ctrl - h : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace prev
-ctrl - l : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace next
+ctrl - h : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace prev
+ctrl - l : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace next

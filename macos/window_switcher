@@ -21,7 +21,7 @@ WIDTH=55          # 列表宽度（屏幕宽度的百分比）
 ROWS=12           # 最多显示几行
 
 export PATH=/opt/homebrew/bin:/usr/bin:/bin
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 STATE="/tmp/yabai-aero-$USER"
 mkdir -p "$STATE"
 

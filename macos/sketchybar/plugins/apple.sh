@@ -5,7 +5,7 @@
 # 锁屏用 aero-helper lock（和 ⌃⌘Q 同一个系统函数）；睡眠是 pmset sleepnow，和原生一样立刻睡。
 STATE="/tmp/yabai-aero-$USER"
 HELPER="$HOME/.cache/fantastic-i3/aero-helper"
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 POPUPS="gpu cpu mem disk net input volume battery clock"
 [ "$SENDER" = mouse.clicked ] || exit 0
 

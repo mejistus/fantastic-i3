@@ -10,7 +10,7 @@
 # 移动窗口到其他工作区（⌥⇧ + 数字 / 字母、下面规则里的工作区分配）不需要 SA。
 # 开启 SA：运行 ./setup-sa（只需一次；yabai 升级后再运行一次）。
 
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 
 # aero reload 会重新执行本文件：先清掉旧的规则和信号
 while yabai -m rule --remove 0 2>/dev/null; do :; done

@@ -12,7 +12,7 @@
 export PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
 source "$CONFIG_DIR/colors.sh"
 PLUGINS="$CONFIG_DIR/plugins"
-AERO="$HOME/Documents/fantastic-i3/macos/yabai/aero"
+AERO="$HOME/Documents/fantastic-i3-macOS/yabai/aero"
 FONT="Maple Mono NF"   # 图标字形（Nerd Font）。文字的字体按主题在 colors.sh 里（TEXT_FONT）
 APP_FONT="sketchybar-app-font:Regular"
 HELPER="$HOME/.cache/fantastic-i3/aero-helper"

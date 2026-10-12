@@ -23,7 +23,7 @@ alt - m : yabai -m space --focus M
 alt - t : yabai -m space --focus T
 
 # workspace next / prev（⌃H ⌃L，或 ⌃⌥← ⌃⌥→）
-ctrl - l           : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace next
-ctrl - h           : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace prev
-ctrl + alt - right : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace next
-ctrl + alt - left  : $HOME/Documents/fantastic-i3/macos/yabai/aero workspace prev
+ctrl - l           : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace next
+ctrl - h           : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace prev
+ctrl + alt - right : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace next
+ctrl + alt - left  : $HOME/Documents/fantastic-i3-macOS/yabai/aero workspace prev
