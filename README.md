@@ -43,15 +43,20 @@ i3 on X11 with polybar, rofi, kitty, picom, dunst, conky and NvChad, all in one 
 
 ## macOS: yabai
 
-The same habits on macOS: yabai tiles windows, skhd handles the keys and SketchyBar replaces the menu bar. There are 17 workspaces, a window switcher with pinyin search, and per-app layout and workspace memory. It lives in its own repo, [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS), included here as the `macos` submodule.
+The same habits on macOS: yabai tiles windows, skhd handles the keys and SketchyBar replaces the menu bar. There are 17 workspaces, a window switcher with pinyin search, and per-app layout and workspace memory. It lives in its own repo, [fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app), and installs with Homebrew on Apple Silicon:
 
-On Apple Silicon, one line installs everything, Homebrew included, and clones fantastic-i3-macOS out of sight to `~/.local/share/fantastic-i3-macOS`:
+```sh
+brew install mejistus/mona/fantastic-i3
+fantastic-i3 setup
+```
+
+`setup` is safe to rerun. At the end it lists what's left to do by hand and prints a key cheat sheet worth a screenshot.
+
+The macOS extras (small tools, kitty, the shared tmux config) are in [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS), included here as the `macos` submodule. Its one-line installer sets up all of it, Homebrew and the tiling desktop included:
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"
 ```
-
-It's safe to rerun. At the end it lists what's left to do by hand and prints a key cheat sheet worth a screenshot. With this repo cloned, `git submodule update --init macos` fetches it, then run `bash macos/install.sh`.
 
 | Key | Action |
 |---|---|
@@ -73,10 +78,14 @@ It's safe to rerun. At the end it lists what's left to do by hand and prints a k
 | <kbd>⌥⇧V</kbd> | Clipboard history, searchable |
 | <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | Screenshot → text / LaTeX formula, copied |
 
-All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS)**.
+All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app)**.
 
 ## Credits
 
 Built on [NvChad](https://nvchad.com/), [slate-conky-theme](https://github.com/CrispyKSP/slate-conky-theme), [MacTahoe](https://github.com/vinceliuice/MacTahoe-gtk-theme), [yabai](https://github.com/asmvik/yabai), [skhd](https://github.com/asmvik/skhd), [SketchyBar](https://github.com/FelixKratz/SketchyBar) and many more. Respect for all these great open-source projects.
 
 The Neovim config was mostly written by Claude Code. The Linux theme was fixed up with Muse Spark 1.3 Free and DeepSeek 4.1 Flash. Thanks to free software and free models.
+
+## License
+
+My own configs and scripts here are licensed under [GPL-3.0](LICENSE) or later. Third-party files keep their own licenses: the NvChad starter in `nvim/` (Unlicense), the kitty themes in `kitty/themes/` (MIT), the rofi themes from [JaKooLit](https://github.com/JaKooLit) and others in `rofi/`, the Kvantum themes (Catppuccin, MacTahoe), slate-conky-theme and its fonts in `conky/`, and the wallpapers in `backgrounds/`, which belong to their authors.

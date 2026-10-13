@@ -43,15 +43,20 @@ X11 上的 i3，配 polybar、rofi、kitty、picom、dunst、conky 和 NvChad，
 
 ## macOS: yabai
 
-在 macOS 上沿用同一套习惯：yabai 平铺窗口，skhd 管快捷键，SketchyBar 代替菜单栏。有 17 个工作区、能用拼音搜索的窗口切换器，还能按应用记住布局和工作区。它是单独的仓库 [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)，在这里是子模块 `macos`。
+在 macOS 上沿用同一套习惯：yabai 平铺窗口，skhd 管快捷键，SketchyBar 代替菜单栏。有 17 个工作区、能用拼音搜索的窗口切换器，还能按应用记住布局和工作区。它是单独的仓库 [fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app/blob/main/README.zh-CN.md)，Apple Silicon 上用 Homebrew 装：
 
-Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS 会克隆到看不见的 `~/.local/share/fantastic-i3-macOS`：
+```sh
+brew install mejistus/mona/fantastic-i3
+fantastic-i3 setup
+```
+
+`setup` 可以重复运行。最后会列出还要手动做的事，再打印一张快捷键表，建议截图保存。
+
+macOS 上的其它东西（小工具、kitty、共用的 tmux 配置）在 [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)，在这里是子模块 `macos`。它的一键安装把这些连同 Homebrew 和平铺桌面一起装好：
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"
 ```
-
-可以重复运行。最后会列出还要手动做的事，再打印一张快捷键表，建议截图保存。已经克隆了本仓库的话，先 `git submodule update --init macos` 取下子模块，再运行 `bash macos/install.sh`。
 
 | 快捷键 | 作用 |
 |---|---|
@@ -73,10 +78,14 @@ Apple Silicon 上一行装好全部（包括 Homebrew），fantastic-i3-macOS �
 | <kbd>⌥⇧V</kbd> | 剪贴板历史，能搜索 |
 | <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | 截图识字 / 截图识公式（LaTeX），复制到剪贴板 |
 
-全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)**。
+全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app/blob/main/README.zh-CN.md)**。
 
 ## 致谢
 
 用到了 [NvChad](https://nvchad.com/)、[slate-conky-theme](https://github.com/CrispyKSP/slate-conky-theme)、[MacTahoe](https://github.com/vinceliuice/MacTahoe-gtk-theme)、[yabai](https://github.com/asmvik/yabai)、[skhd](https://github.com/asmvik/skhd)、[SketchyBar](https://github.com/FelixKratz/SketchyBar) 等等。向这些优秀的开源项目致敬。
 
 Neovim 配置大部分由 Claude Code 编写。Linux 主题借助 Muse Spark 1.3 Free 和 DeepSeek 4.1 Flash 修好。感谢自由软件，也感谢免费的模型。
+
+## 许可证
+
+这里我自己写的配置和脚本按 [GPL-3.0](LICENSE) 或更新的版本发布。第三方的文件保留它们原来的许可证：`nvim/` 里的 NvChad 起步配置（Unlicense）、`kitty/themes/` 里的 kitty 主题（MIT）、`rofi/` 里来自 [JaKooLit](https://github.com/JaKooLit) 等人的主题、Kvantum 主题（Catppuccin、MacTahoe）、`conky/` 里的 slate-conky-theme 和它带的字体，以及 `backgrounds/` 里的壁纸，版权归原作者。
