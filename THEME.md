@@ -44,6 +44,8 @@ QT_QPA_PLATFORMTHEME=qt6ct
 # GNOME keyring / icon 主题等见各节
 # 妙控板三指手势（配置在 touchegg/，~/.config/touchegg 链接过来；客户端由 i3/start.sh 启动）
 sudo pacman -S --needed touchegg && sudo systemctl enable --now touchegg.service
+# 触控板的速度（指针 0.4、滚动 12，比默认快）：仓库里的 X 配置拷过去，重新登录生效
+sudo cp ~/Documents/fantastic-i3/xorg/30-touchpad.conf /etc/X11/xorg.conf.d/
 ```
 
 ## 改后重载（免注销清单）
