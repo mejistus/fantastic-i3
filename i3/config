@@ -41,7 +41,7 @@ workspace 10 output HDMI-1
 # use $mod+Mouse to drag floating windows to their wanted position
 floating_modifier $mod
 
-focus_follows_mouse no
+focus_follows_mouse yes
 # tiling_drag on
 # tiling_drag modifier
 # |titlebar
