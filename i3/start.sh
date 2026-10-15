@@ -6,6 +6,7 @@ feh --bg-fill /usr/share/backgrounds/backgound &
 fcitx5 -r &
 eval $(gnome-keyring-daemon --start --components=secrets) >/dev/null 2>&1
 clipit &
+pgrep -u "$USER" -x touchegg >/dev/null || touchegg &   # 触控板手势的客户端（服务端是系统的 touchegg.service），i3 restart 时不重复起
 i3-auto-tiling &
 bash $HOME/.config/i3/NIC.sh
 xset r rate 300 50 &

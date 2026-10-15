@@ -42,6 +42,8 @@ kitty/kitty.conf                    → ~/.config/kitty/kitty.conf（font Maple 
 QT_QPA_PLATFORMTHEME=qt6ct
 # root 的 GTK（给 timeshift 等）：/root/.config/gtk-{3,4}.0/settings.ini 同样写 MacTahoe-Dark-solid
 # GNOME keyring / icon 主题等见各节
+# 妙控板三指手势（配置在 touchegg/，~/.config/touchegg 链接过来；客户端由 i3/start.sh 启动）
+sudo pacman -S --needed touchegg && sudo systemctl enable --now touchegg.service
 ```
 
 ## 改后重载（免注销清单）
