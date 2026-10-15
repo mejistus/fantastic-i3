@@ -1,4 +1,8 @@
+# qutebrowser 配置文件
+# 保存为 ~/.config/qutebrowser/config.py 或 ~/.qutebrowser/config.py
+
 import os
+# 加载自动配置文件
 config.load_autoconfig()
 
 # ========== 常规设置 ==========
@@ -10,10 +14,10 @@ c.editor.command = ['nvim', '-f', '{file}']  # 编辑器的命令
 # ========== 外观设置 ==========
 c.colors.webpage.darkmode.enabled = False # 启用暗黑模式
 c.fonts.default_family = 'Noto Sans CJK SC'  # 默认字体
-c.fonts.default_size = '12pt'
+c.fonts.default_size = '14pt'
 
 # 标签栏设置
-c.tabs.position = 'top'
+c.tabs.position = 'bottom'
 c.tabs.show = 'multiple'
 c.tabs.title.format = '{audio}{current_title}'
 
@@ -41,7 +45,7 @@ c.content.headers.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.
 
 # ========== 高级设置 ==========
 c.qt.highdpi = True  # 启用 HiDPI 支持
-# c.url.start_pages = ['https://www.google.com']  # 启动页面
+c.url.start_pages = ['https://www.google.com']  # 启动页面
 
 # 统一 Alt 键作为全局修饰键示例
 # ========== 标签页管理快捷键 (Alt 修饰键) ==========

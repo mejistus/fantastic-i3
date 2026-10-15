@@ -11,6 +11,7 @@ settings:
     http://127.0.0.1:8192: access-paste
     https://chat.deepseek.com: access-paste
     https://github.com: access-paste
+    https://ollama.com: access-paste
   statusbar.show:
     global: always
   tabs.show:

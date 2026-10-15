@@ -1,0 +1,75 @@
+[Hotkey]
+# 按住切換鍵的修飾鍵時進行輪換切換
+EnumerateWithTriggerKeys=False
+# 啟用輸入法
+ActivateKeys=
+# 停用輸入法
+DeactivateKeys=
+# 臨時切換輸入法
+AltTriggerKeys=
+# 枚舉輸入法向前
+EnumerateForwardKeys=
+# 枚舉輸入法向後
+EnumerateBackwardKeys=
+# 枚舉時略過第一個輸入法
+EnumerateSkipFirst=False
+# 枚舉輸入法群組向前
+EnumerateGroupForwardKeys=
+# 枚舉輸入法群組向後
+EnumerateGroupBackwardKeys=
+# 切換內嵌預編輯區域
+TogglePreedit=
+# 觸發修飾鍵快捷鍵的時限（毫秒）
+ModifierOnlyKeyTimeout=250
+
+[Hotkey/TriggerKeys]
+0=Control+Shift+space
+
+[Hotkey/PrevPage]
+0=Up
+
+[Hotkey/NextPage]
+0=Down
+
+[Hotkey/PrevCandidate]
+0=Shift+Tab
+
+[Hotkey/NextCandidate]
+0=Tab
+
+[Behavior]
+# Activate input method by default
+ActiveByDefault=False
+# 重新聚焦時重設狀態
+resetStateWhenFocusIn=No
+# 共享輸入法狀態
+ShareInputState=No
+# 在應用程式中顯示預編輯
+PreeditEnabledByDefault=True
+# 當切換輸入法時顯示輸入法資訊
+ShowInputMethodInformation=True
+# 當切換輸入焦點時顯示輸入法資訊
+showInputMethodInformationWhenFocusIn=False
+# 顯示緊湊的輸入法訊息
+CompactInputMethodInformation=True
+# 顯示第一個輸入法資訊
+ShowFirstInputMethodInformation=True
+# Default Candidates per page
+DefaultPageSize=10
+# 覆蓋 XKB 選項
+OverrideXkbOption=False
+# 自訂 XKB 選項
+CustomXkbOption=
+# Force Enabled Addons
+EnabledAddons=
+# Force Disabled Addons
+DisabledAddons=
+# Preload input method to be used by default
+PreloadInputMethod=True
+# 允許在密碼輸入框中使用輸入法
+AllowInputMethodForPassword=False
+# 輸入密碼時顯示預編輯文本
+ShowPreeditForPassword=False
+# 儲存使用者數據的時間間隔（以分鐘為單位）
+AutoSavePeriod=30
+

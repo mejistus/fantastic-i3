@@ -67,12 +67,6 @@
             "text": "echo 'Intel Core i9 12900 (24) @ 4.900GHz'"
         },
         {
-            "type": "cpu",
-            "format": "{1}",
-            "key": "   CPU",
-            "keyColor": "blue"
-        },
-        {
             "type": "gpu",
             "format": "{2}",
             "key": "   GPU",

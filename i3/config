@@ -69,13 +69,13 @@ set $term kitty
 bindsym $mod+b exec --no-startup-id bilibili
 bindsym $mod+c exec --no-startup-id rofi-code
 bindsym Ctrl+$mod+Return exec --no-startup-id pkill polybar || bash ~/.config/polybar/launch.sh 
-bindsym $mod+Return exec --no-startup-id $term 
+bindsym $mod+Shift+Return exec --no-startup-id $term 
 bindsym $mod+space exec --no-startup-id pkill -x rofi || bash ~/.config/rofi/launcher.sh
 bindsym $alt+Tab exec --no-startup-id pkill -x rofi || rofi -show window
 bindsym $mod+Tab workspace back_and_forth
 # bindsym $mod+g exec --no-startup-id google-chrome-stable
 # bindsym $mod+g exec --no-startup-id firefox
-bindsym $mod+g exec --no-startup-id microsoft-edge-stable
+bindsym $mod+g exec --no-startup-id microsoft-edge-stable --proxy-server=http://127.0.0.1:7890
 # bindsym $mod+g exec --no-startup-id qutebrowser
 # bindsym $mod+n exec --no-startup-id neovide
 bindsym $mod+d exec --no-startup-id dolphin
@@ -294,6 +294,8 @@ for_window [class="kvantummanager"]                 floating enable
 for_window [class="livecaptions"]                   floating enable
 for_window [class="Kvantum Manager"]                floating enable
 for_window [class="steamwebhelper"]                 floating enable
+for_window [class="Alert"]                          floating enable
+for_window [title="進度"]                           floating enable
 for_window [class="Viewnior"]                       floating enable
 for_window [class="lx-music-desktop"]               floating enable
 for_window [class="trayer"]                         floating enable
