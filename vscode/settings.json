@@ -1,5 +1,4 @@
 {
-  "window.menuBarVisibility": "toggle",
   "editor.fontSize": 18,
   "editor.scrollbar.verticalScrollbarSize": 0,
   "security.workspace.trust.untrustedFiles": "newWindow",
@@ -24,7 +23,6 @@
   "chat.editor.fontFamily": "'MesloLGS NF'",
   "chat.editor.fontSize": 16,
   "editor.inlineSuggest.fontFamily": "",
-  "vim.sneak": true,
   "workbench.colorCustomizations": {
     "statusBar.background": "#292a31",
     "statusBar.noFolderBackground": "#005f5f",
@@ -32,18 +30,6 @@
     "statusBar.foreground": "#ffffff",
     "statusBar.debuggingForeground": "#ffffff"
   },
-  "C_Cpp.intelliSenseEngine": "disabled",
-  "C_Cpp.autocompleteAddParentheses": true,
-  "C_Cpp.default.cppStandard": "c++17",
-  "C_Cpp.default.cStandard": "c17",
-  "[cpp]": {
-    "editor.defaultFormatter": "xaver.clang-format"
-  },
-  "code-runner.clearPreviousOutput": true,
-  "code-runner.runInTerminal": true,
-  "clangd.arguments": [
-    "-std=c++17"
-  ],
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "git.autofetch": true,
   "notebook.cellToolbarLocation": {
@@ -56,7 +42,6 @@
     "*.pdf": "default"
   },
   "git.openRepositoryInParentFolders": "never",
-  "database-client.autoSync": true,
   "[html]": {
     "editor.defaultFormatter": "vscode.html-language-features"
   },
@@ -66,8 +51,6 @@
   "[css]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "lldb.suppressUpdateNotifications": true,
-  "aiXcoder.autoPredictContent": "smart",
   "postfix.languages": [
     "python",
     "javascript",
@@ -88,125 +71,17 @@
   "terminal.integrated.copyOnSelection": true,
   "explorer.confirmDelete": false,
   "notebook.output.wordWrap": true,
-  "vue.server.hybridMode": false,
   "notebook.lineNumbers": "on",
-  "latex-workshop.intellisense.citation.backend": "biblatex",
-  "latex-workshop.latex.outDir": "%DIR%/out",
-  "latex-workshop.view.pdf.internal.synctex.keybinding": "double-click",
-  "latex-workshop.synctex.synctexjs.enabled": true,
-  "latex-workshop.synctex.afterBuild.enabled": true,
-  "latex-workshop.latex.recipes": [
-    {
-      "name": "tectonic",
-      "tools": [
-        "tectonic"
-      ]
-    },
-    {
-      "name": "xelatex",
-      "tools": [
-        "xelatex"
-      ]
-    },
-    {
-      "name": "latexmk",
-      "tools": [
-        "latexmk"
-      ]
-    }
-  ],
-  "latex-workshop.latex.tools": [
-    {
-      "name": "tectonic",
-      "command": "tectonic",
-      "args": [
-        "-X",
-        "compile",
-        "%DOC_EXT%",
-        "--synctex",
-        "--keep-intermediates",
-        "--keep-logs",
-        "--outdir",
-        "%OUTDIR%"
-      ]
-    },
-    {
-      "name": "xelatex",
-      "command": "xelatex",
-      "args": [
-        "-synctex=1",
-        "-interaction=nonstopmode",
-        "-file-line-error",
-        "-output-directory=%OUTDIR%",
-        "%DOC%"
-      ]
-    },
-    {
-      "name": "latexmk",
-      "command": "latexmk",
-      "args": [
-        "-synctex=1",
-        "-interaction=nonstopmode",
-        "-file-line-error",
-        "-pdf",
-        "-outdir=%OUTDIR%",
-        "%DOC%"
-      ]
-    }
-  ],
-  "latex-workshop.view.pdf.viewer": "tab",
-  "latex-workshop.latex.clean.fileTypes": [
-    "*.aux",
-    "*.bbl",
-    "*.blg",
-    "*.idx",
-    "*.ind",
-    "*.lof",
-    "*.lot",
-    "*.out",
-    "*.toc",
-    "*.acn",
-    "*.acr",
-    "*.alg",
-    "*.glg",
-    "*.glo",
-    "*.gls",
-    "*.ist",
-    "*.fls",
-    "*.log",
-    "*.fdb_latexmk"
-  ],
-  "latex.linter.enabled": false,
-  "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  "[latex]": {
-    "editor.defaultFormatter": "mathematic.vscode-latex"
-  },
   "extensions.experimental.affinity": {
     "asvetliakov.vscode-neovim": 1
   },
-  "vscode-neovim.neovimInitVimPaths.darwin": "~/.config/nvim/init.lua",
-  "vscode-neovim.neovimInitVimPaths.linux": "~/.config/nvim/init.lua",
   "terminal.integrated.inheritEnv": false,
   "notebook.defaultFormatter": "ms-python.python",
   "notebook.output.scrolling": true,
-  "animations.Install-Method": "Apc Customize UI++",
   "jupyter.askForKernelRestart": false,
   "markdown.preview.typographer": true,
-  "markdown-preview-enhanced.automaticallyShowPreviewOfMarkdownBeingEdited": true,
   "editor.cursorSmoothCaretAnimation": "on",
   "editor.cursorBlinking": "smooth",
-  "code-runner.languageIdToFileExtensionMap": {
-    "bat": ".bat",
-    "powershell": ".ps1",
-    "typescript": ".ts"
-  },
-  "cmake.showOptionsMovedNotification": false,
-  "cmake.pinnedCommands": [
-    "workbench.action.tasks.configureTaskRunner",
-    "workbench.action.tasks.runTask"
-  ],
   "git.enableSmartCommit": true,
   "explorer.confirmPasteNative": false,
   "[python]": {
@@ -223,16 +98,10 @@
   "python.analysis.enablePytestSupport": false,
   "python.languageServer": "Pylance",
   "workbench.editorLargeFileConfirmation": 10,
-  "latex-workshop.latex.autoBuild.run": "onSave",
-  "latex-workshop.latex.autoBuild.interval": 1000,
-  "latex-workshop.view.pdf.autoRefresh.interval": 1000,
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.enableTroubleshootMissingImports": true,
   "terminal.integrated.ignoreBracketedPasteMode": true,
   "terminal.integrated.tabs.defaultColor": "terminal.ansiCyan",
-  "vim.autoSwitchInputMethod.enable": true,
-  "vim.enableNeovim": true,
-  "vim.neovimUseConfigFile": true,
   "github.copilot.enable": {
     "*": false,
     "plaintext": false,
@@ -284,7 +153,7 @@
     "editor.defaultFormatter": "yzhang.markdown-all-in-one"
   },
   "[shellscript]": {
-    "editor.defaultFormatter": "shakram02.bash-beautify"
+    "editor.defaultFormatter": "mkhl.shfmt"
   },
   "workbench.editor.empty.hint": "hidden",
   "python.terminal.activateEnvironment": false,
@@ -298,9 +167,6 @@
   "python.analysis.autoFormatStrings": true,
   "python.analysis.typeEvaluation.analyzeUnannotatedFunctions": false,
   "python.analysis.supportAllPythonDocuments": true,
-  "[c]": {
-    "editor.defaultFormatter": "xaver.clang-format"
-  },
   "python.defaultInterpreterPath": "/usr/bin/python",
   "jupyter.toc.flat": true,
   "workbench.colorTheme": "One Dark Pro Darker",
@@ -308,7 +174,6 @@
   "editor.codeActionsOnSave": {},
   "editor.mouseWheelZoom": true,
   "markdown.preview.fontSize": 4,
-  "editor.wordWrap": "wordWrapColumn",
   "workbench.settings.applyToAllProfiles": [
     "editor.fontSize",
     "editor.fontFamily",
@@ -999,7 +864,6 @@
     "-files.dialog.defaultPath",
     "-workbench.welcomePage.walkthroughs.openOnInstall",
     "-window.zoomLevel",
-    "-python.analysis.cacheLSPData",
     "-python.analysis.nodeArguments",
     "-python.analysis.nodeExecutable",
     "-python.useEnvironmentsExtension"
@@ -1032,10 +896,8 @@
   "terminal.integrated.localEchoEnabled": "auto",
   "bookmarks.label.suggestion": "suggestWhenSelectedOrLineWhenNoSelected",
   "bookmarks.saveBookmarksInProject": true,
-  "gutterpreview.imagePreviewMaxHeight": 1024,
-  "gutterpreview.imagePreviewMaxWidth": 1024,
   "prettier.tabWidth": 4,
-  "prettier.printWidth": 180,
+  "prettier.printWidth": 80,
   "python.analysis.importFormat": "relative",
   "editor.autoClosingDelete": "always",
   "editor.autoIndent": "advanced",
@@ -1043,34 +905,219 @@
   "editor.guides.bracketPairsHorizontal": false,
   "window.density.editorTabHeight": "compact",
   "workbench.editor.pinnedTabsOnSeparateRow": true,
-  "xlsxViewer.md.stickyToolbar": false,
-  "xlsxViewer.md.wordWrap": true,
-  "xlsxViewer.md.syncScroll": true,
-  "xlsxViewer.md.previewPosition": "right",
   "black-formatter.args": [
-    "\"black-formatter.args\" = [\"--line-length\", \"180\"]"
+    "\"black-formatter.args\" = [\"--line-length\", \"80\"]"
   ],
   "workbench.secondarySideBar.defaultVisibility": "hidden",
   "workbench.startupEditor": "none",
-  "markdown-preview-enhanced.previewTheme": "github-dark.css",
-  "markdown-preview-enhanced.codeBlockTheme": "one-dark.css",
   "editor.formatOnSave": true,
   "files.exclude": {
     "**/.venv": true,
     "**/venv": true
   },
-  "remote.SSH.remotePlatform": {
-    "frp-cat.com": "linux"
-  },
   "window.density.layout": "compact",
-  "claudeCode.preferredLocation": "panel",
-  "workbench.statusBar.visible": false,
-  "latex-utilities.message.update.show": false,
+  "editor.wordWrapIndicator": true,
+  "latex-workshop.synctex.synctexjs.enabled": true,
+  "latex-workshop.synctex.afterBuild.enabled": true,
+  "latex-workshop.view.pdf.viewer": "tab",
+  "latex-workshop.intellisense.citation.backend": "biblatex",
+  "latex-workshop.latex.outDir": "%DIR%/out",
+  "latex-workshop.view.pdf.internal.synctex.keybinding": "double-click",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "tectonic",
+      "tools": [
+        "tectonic"
+      ]
+    },
+    {
+      "name": "xelatex",
+      "tools": [
+        "xelatex"
+      ]
+    },
+    {
+      "name": "latexmk",
+      "tools": [
+        "latexmk"
+      ]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "tectonic",
+      "command": "tectonic",
+      "args": [
+        "-X",
+        "compile",
+        "%DOC_EXT%",
+        "--synctex",
+        "--keep-intermediates",
+        "--keep-logs",
+        "--outdir",
+        "%OUTDIR%"
+      ],
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    },
+    {
+      "name": "xelatex",
+      "command": "xelatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-output-directory=%OUTDIR%",
+        "%DOC%"
+      ],
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    },
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-pdf",
+        "-outdir=%OUTDIR%",
+        "%DOC%"
+      ],
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/Library/TeX/texbin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    },
+  ],
+  "latex-workshop.latex.clean.fileTypes": [
+    "*.aux",
+    "*.bbl",
+    "*.blg",
+    "*.idx",
+    "*.ind",
+    "*.lof",
+    "*.lot",
+    "*.out",
+    "*.toc",
+    "*.acn",
+    "*.acr",
+    "*.alg",
+    "*.glg",
+    "*.glo",
+    "*.gls",
+    "*.ist",
+    "*.fls",
+    "*.log",
+    "*.fdb_latexmk"
+  ],
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[latex]": {
+    "editor.defaultFormatter": "mathematic.vscode-latex"
+  },
   "latex-workshop.bibtex-fields.sort.enabled": true,
   "latex-workshop.bibtex-format.sort.enabled": true,
-  "latex-workshop.formatting.latex": "latexindent",
-  "latex-workshop.intellisense.biblatexJSON.replace": {},
-  "editor.wordWrapIndicator": true,
-  "chat.editor.wordWrap": "on",
   "latex-workshop.bibtex-format.tab": "4 spaces",
+  "latex-utilities.formattedPaste.image.template": "",
+  "latex-workshop.formatting.latex": "latexindent",
+  "latex-workshop.formatting.latexindent.args": [
+    "-c",
+    "%DIR%/",
+    "-l",
+    "%DIR%/localSettings.yaml",
+    "%TMPFILE%",
+    "-m"
+  ],
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.autoBuild.interval": 1000,
+  "extensions.supportAgentsWindow": {
+    "ltmoerdani.opencode-copilot-chat": true
+  },
+  "chat.agentHost.byokModels.enabled": true,
+  "customLlm.models": [
+    {
+      "id": "qwen3-coder-plus",
+      "name": "Qwen3 Coder Plus",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "qwen3-coder-next",
+      "name": "Qwen3 Coder Next",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "qwen3-max-2026-01-23",
+      "name": "Qwen3 Max",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "qwen3.5-plus",
+      "name": "Qwen3.5 Plus",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 16384,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "qwen3.6-plus",
+      "name": "Qwen3.6 Plus",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 65536,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "glm-5",
+      "name": "GLM-5",
+      "maxInputTokens": 204800,
+      "maxOutputTokens": 16384,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "glm-4.7",
+      "name": "GLM-4.7",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "kimi-k2.5",
+      "name": "Kimi K2.5",
+      "maxInputTokens": 262144,
+      "maxOutputTokens": 32768,
+      "providerId": "alibaba-dashscope"
+    },
+    {
+      "id": "MiniMax-M2.5",
+      "name": "MiniMax M2.5",
+      "maxInputTokens": 262144,
+      "maxOutputTokens": 8192,
+      "providerId": "alibaba-dashscope"
+    }
+  ],
+  "html.format.wrapLineLength": 80,
+  "minimax.apiBaseUrl": "https://api.minimaxi.com/anthropic",
+  "minimaxStatus.token": "sk-cp-HGrDw1vLN3sV9uqEsS9CzSUBIeerXqC71bIEXS3URT1E2owJKf9ksUgJzl1EWOWT3dPY7x5de7QhOzld0nwTXBuGBlfmbL0vqamMWBaFvVPIarbw9H0T1s8",
+  "minimaxStatus.refreshInterval": 30,
+  "minimaxStatus.showTooltip": true,
+  "minimaxStatus.modelName": "",
+  "minimaxStatus.overseasDisplay": "none",
+  "minimaxStatus.overseasToken": "",
+  "minimaxStatus.language": "zh-CN",
+  "minimax.apiKey": "sk-cp-HGrDw1vLN3sV9uqEsS9CzSUBIeerXqC71bIEXS3URT1E2owJKf9ksUgJzl1EWOWT3dPY7x5de7QhOzld0nwTXBuGBlfmbL0vqamMWBaFvVPIarbw9H0T1s8",
+  "minimax.claudeCode.allowedModels": [
+    "MiniMax-M3.1-Flash-Preview",
+    "MiniMax-M3",
+    "MiniMax-M3-Priority"
+  ],
+  "minimax.enableM31MContext": true,
+  "chat.viewSessions.orientation": "stacked",
+  "extensions.ignoreRecommendations": true,
 }
