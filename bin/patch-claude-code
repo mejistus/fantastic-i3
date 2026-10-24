@@ -40,7 +40,6 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
     patch-claude-code setup --preset opencode-go    # OpenCode Go 套餐（key 读 $OPENCODE_GO_APIKEY）
     patch-claude-code setup --preset minimax-cn     # MiniMax 编码套餐（$MINIMAX）
     patch-claude-code setup --preset deepseek       # DeepSeek 官方（$DEEPSEEK_API_KEY）
-    patch-claude-code setup --preset opencode-free  # 免费层（服务端限制，外部调不通，仅作参考）
     patch-claude-code link                          # 把自己链到 ~/.local/bin
 
 前提：先用官方方式装好 Claude Code（npm i -g @anthropic-ai/claude-code，或官方原生安装包），
@@ -67,7 +66,7 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
     #   --picker ID[:显示名[:说明]]  /model 里显示哪些行，可重复，书写顺序即显示顺序
     #                         例: --picker kimi-k3 --picker "glm-5.3:GLM-5.3:1M ctx · 适合长文"
     #
-    # 常见网关（opencode-go / opencode-free / minimax-cn / deepseek）已经内置成预设，
+    # 常见网关（opencode-go / minimax-cn / deepseek）已经内置成预设，
     # 用 `setup --preset <名字>` 就行，不用手写 --picker；`add` 留给自建网关。
     #
     # --discover  自动问网关要模型列表（opencode 的 /v1/models 是 404，会退回你给的值）
@@ -139,26 +138,6 @@ PRESETS = {
             ("qwen3.8-max", "Qwen3.8 Max", "$2/$6 per Mtok · 1M ctx"),
         ],
         "note": "额度用尽时网关返回 402，不是配置问题",
-    },
-    "opencode-free": {
-        "label": "OpenCode 免费层（同一账号的 free 模型）",
-        "base_url": "https://opencode.ai/inference/anthropic",
-        "auth_var": "OPENCODE_GO_APIKEY",
-        "opus": "glm-5.3-flash-free",
-        "sonnet": "deepseek-v4.1-flash-free",
-        "haiku": "mimo-v2.6-flash-free",
-        "max_context": 200000,
-        "blocked": "免费层被服务端限制：只在 OpenCode 客户端内可用。"
-                   "外部调用一律返回 FreeTierError（已实测，改 UA/换模型都不行）",
-        "picker": [
-            ("deepseek-v4.1-flash-free", "DeepSeek V4.1 Flash Free", "free · 200K ctx · 仅 OpenCode 内可用"),
-            ("glm-5.3-flash-free", "GLM-5.3-Flash Free", "free · 200K ctx · 仅 OpenCode 内可用"),
-            ("mimo-v2.6-flash-free", "MiMo-V2.6-Flash Free", "free · 200K ctx · 仅 OpenCode 内可用"),
-            ("nemotron-3-ultra-free", "Nemotron 3 Ultra Free", "free · 1M ctx · 仅 OpenCode 内可用"),
-            ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free", "free · 仅 OpenCode 内可用"),
-            ("flint-40b-free", "Flint 40B Free", "free · 256K ctx · 仅 OpenCode 内可用"),
-            ("big-pickle", "Big Pickle", "free · 200K ctx · 仅 OpenCode 内可用"),
-        ],
     },
     "deepseek": {
         "label": "DeepSeek 官方（Anthropic 兼容端点 · 按 token 计费）",

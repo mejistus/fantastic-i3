@@ -23,7 +23,7 @@ Then, with Claude Code already installed the official way
 (`npm i -g @anthropic-ai/claude-code`, or the native installer):
 
 ```sh
-patch-claude-code presets                      # minimax-cn, opencode-go, opencode-free, deepseek
+patch-claude-code presets                      # minimax-cn, opencode-go, deepseek
 patch-claude-code setup --preset opencode-go   # key read from $OPENCODE_GO_APIKEY
 ```
 
@@ -47,15 +47,8 @@ patch-claude-code setup --preset opencode-go --key-var OPENCODE_GO_APIKEY
 | --- | --- | --- |
 | `minimax-cn` | `api.minimaxi.com/anthropic` | `$MINIMAX` |
 | `opencode-go` | `opencode.ai/inference/go/anthropic` | `$OPENCODE_GO_APIKEY` |
-| `opencode-free` | `opencode.ai/inference/anthropic` | `$OPENCODE_GO_APIKEY` |
 | `deepseek` | `api.deepseek.com/anthropic` | `$DEEPSEEK_API_KEY` |
 
-`opencode-free` is listed for completeness, not because it works: the free tier is
-gated server-side to the OpenCode client itself. Calling it from anywhere else —
-Claude Code, curl, a different User-Agent, any free model id — returns
-`403 FreeTierError: OpenCode's free tier can only be used from within OpenCode`.
-`verify` reports exactly that, and the preset rows are labelled `仅 OpenCode 内可用`
-so nobody mistakes them for a working option.
 
 Keys are read in this order: `--key` → the variable in `~/.zshrc` → the same
 variable in the environment → an interactive prompt (no echo). When the key comes
@@ -122,6 +115,9 @@ patch-claude-code revert             # roll back to the newest backup
   configured. Add `--keep-builtin` to append them after the built-in
   Opus/Sonnet/Haiku rows instead.
 - A `402 Insufficient account funds` from a gateway is billing, not config.
+- OpenCode's free tier is gated server-side to the OpenCode client itself: from
+  anywhere else it answers `403 FreeTierError`. There is deliberately no preset
+  for it — it cannot work as a Claude Code gateway.
 
 ## 中文速览
 
