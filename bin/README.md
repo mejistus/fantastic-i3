@@ -103,6 +103,34 @@ patch-claude-code unpatch            # remove the patch, back to official endpoi
 patch-claude-code revert             # roll back to the newest backup
 ```
 
+## OpenAI-only models (the free one)
+
+Claude Code speaks Anthropic `/v1/messages`; some gateways serve models only over
+OpenAI `/chat/completions`. OpenCode Go's `beam-free` is one of those: it is free
+on a Go key (`cost: 0`, `billing_source: go`), but the Anthropic endpoint answers
+`ModelProtocolUnsupported`, and the zen endpoint gates the whole free tier to the
+OpenCode client.
+
+`bin/claude-code-proxy` bridges the two, stdlib only:
+
+```sh
+./bin/claude-code-proxy \
+    --upstream https://opencode.ai/inference/go/openai/v1 \
+    --upstream-key-env OPENCODE_GO_APIKEY \
+    --model beam-free --port 8787 --token local-proxy
+
+# 另一个终端
+patch-claude-code setup --preset opencode-beam    # http://127.0.0.1:8787
+```
+
+`--selftest` hits the upstream once and prints the reply and cost without starting
+the server. Verified end to end: plain replies, streaming, tool calls — Claude Code
+runs `echo` through it fine.
+
+The proxy is a translator, not a jailbreak: it only moves bytes between the two
+protocols, using the key you already have. If the proxy is not running, Claude Code
+gets a connection error — switch back with `patch-claude-code use minimax-cn`.
+
 ## Notes
 
 - Every write to `settings.json` is backed up to `~/.claude/backups/`.
