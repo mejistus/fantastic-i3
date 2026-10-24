@@ -457,7 +457,8 @@ def cmd_list(args) -> int:
         base = (prof.get("env") or {}).get("ANTHROPIC_BASE_URL", "?")
         mark = "*" if name == cur else " "
         rows = len((prof.get("modelPicker") or {}).get("options") or [])
-        print(f"{mark} {name:16s} {base:52s} {rows:2d} rows  {prof.get('label', '')}")
+        flag = "  [blocked]" if profile_blocked(prof) else ""
+        print(f"{mark} {name:16s} {base:52s} {rows:2d} rows  {prof.get('label', '')}{flag}")
     if cur is None:
         print("\n(当前 settings.json 不对应任何档案)")
     return 0
@@ -493,6 +494,11 @@ def resolve_env(name: str, key: str):
 
 
 def cmd_use(args) -> int:
+    prof = load_profile(args.name)
+    blocked = profile_blocked(prof)
+    if blocked:
+        print(f"warning: {blocked}")
+        print("         切过去之后选这些模型会 403；要试就试，随时 `use minimax-cn` 切回来")
     apply_profile(args.name, dry_run=args.dry_run)
     return 0
 
@@ -541,6 +547,17 @@ def looks_like_secret(value: str) -> bool:
     if SECRET_SHAPE.match(value):
         return True
     return bool(re.fullmatch(r"[A-Za-z0-9_.+/=\-]{40,}", value))
+
+
+def profile_blocked(prof: dict) -> "str | None":
+    """档案自带 blocked 说明，或它的 base_url 正好是某个 blocked 预设。"""
+    if prof.get("blocked"):
+        return prof["blocked"]
+    base = (prof.get("env") or {}).get("ANTHROPIC_BASE_URL")
+    for preset in PRESETS.values():
+        if preset.get("blocked") and preset.get("base_url") == base:
+            return preset["blocked"]
+    return None
 
 
 def resolve_auth_input(args):
@@ -645,9 +662,10 @@ def cmd_setup(args) -> int:
     if preset is None:
         die(f"没有预设 {args.preset!r}；可选: {', '.join(PRESETS)}，或 `add` 自建")
 
-    if preset.get("blocked"):
-        print(f"warning  : {preset['blocked']}")
-        print("           档案照样能建，但选这些模型会报错；换成 --preset opencode-go / minimax-cn 才能真的用")
+    blocked = preset.get("blocked")
+    if blocked:
+        print(f"warning  : {blocked}")
+        print("           这个预设只写档案、不激活；换成 --preset minimax-cn / deepseek 才能真的用")
 
     name = args.name or args.preset
     if profile_path(name).exists() and not args.force:
@@ -696,6 +714,8 @@ def cmd_setup(args) -> int:
         "model": "sonnet",
         "modelPicker": {"options": options, "replaceBuiltInOptions": not args.keep_builtin},
     }
+    if blocked:
+        prof["blocked"] = blocked
     if var:
         prof["auth_var"] = var          # 只存变量名，key 留在 ~/.zshrc / 环境
     else:
@@ -707,10 +727,12 @@ def cmd_setup(args) -> int:
     else:
         print(f"profile  : {path}  (只存变量名 ${prof['auth_var']})")
 
-    if not args.no_activate:
-        apply_profile(name)
-    else:
+    if args.no_activate:
         print(f"未激活；之后用 `patch-claude-code use {name}` 生效")
+    elif blocked and not args.force:
+        print(f"未激活（blocked 预设不会自动改 settings.json；真要激活：use {name}）")
+    else:
+        apply_profile(name)
 
     result = 0
     if not args.no_verify:
