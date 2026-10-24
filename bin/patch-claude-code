@@ -36,30 +36,40 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
     patch-claude-code remove <name>
 
 一键上手（推荐给刚装好 Claude Code 的人）:
-    patch-claude-code setup --preset minimax-cn     # 建档案 + 激活 + 探活，key 交互输入
-    patch-claude-code setup --preset deepseek --key-var DEEPSEEK_API_KEY
-    patch-claude-code presets                       # 列出内置网关
+    patch-claude-code presets                       # 先看有哪些内置网关
+    patch-claude-code setup --preset opencode-go    # OpenCode Go 套餐（key 读 $OPENCODE_GO_APIKEY）
+    patch-claude-code setup --preset minimax-cn     # MiniMax 编码套餐（$MINIMAX）
+    patch-claude-code setup --preset deepseek       # DeepSeek 官方（$DEEPSEEK_API_KEY）
+    patch-claude-code setup --preset opencode-free  # 免费层（服务端限制，外部调不通，仅作参考）
     patch-claude-code link                          # 把自己链到 ~/.local/bin
 
 前提：先用官方方式装好 Claude Code（npm i -g @anthropic-ai/claude-code，或官方原生安装包），
 本脚本只改它的 provider 配置，不改二进制，也不碰 ~/.claude 之外的任何东西。
 
-新建 provider:
-    patch-claude-code add myprovider \\
-        --base-url https://api.example.com/anthropic \\
-        --auth-var EXAMPLE_API_KEY \\
-        --opus model-a --sonnet model-b --haiku model-c \\
-        --picker model-b --picker model-a \\
-        --discover --verify --activate
+新建 provider（以 OpenCode Go 为例，值是真的，可以直接抄）:
+    patch-claude-code add opencode-go \\
+        --base-url https://opencode.ai/inference/go/anthropic \\
+        --auth-var OPENCODE_GO_APIKEY \\
+        --opus deepseek-v4-pro \\
+        --sonnet deepseek-v4.1-flash \\
+        --haiku deepseek-v4.1-flash \\
+        --picker "deepseek-v4.1-flash:DeepSeek V4.1 Flash:$0.15/$0.6 per Mtok · 1M ctx" \\
+        --picker "deepseek-v4-pro:DeepSeek V4 Pro:$0.66/$1.98 per Mtok · 1M ctx" \\
+        --picker kimi-k3 \\
+        --picker glm-5.3 \\
+        --max-context 1000000 --verify --activate
 
-    # api.example.com / EXAMPLE_API_KEY / model-a|b|c 全是占位符，换成你自己的网关和模型 id。
+    # 换成别的 Anthropic 兼容网关，只改这四项：
+    #   --base-url             https://<你的网关>/anthropic
+    #   --auth-var             存 key 的环境变量名，例如 MINIMAX / DEEPSEEK_API_KEY / MOONSHOT_API_KEY
+    #   --opus/--sonnet/--haiku  该网关真实存在的模型 id（sonnet 是默认模型，haiku 给后台小任务用）
+    #   --picker ID[:显示名[:说明]]  /model 里显示哪些行，可重复，书写顺序即显示顺序
+    #                         例: --picker kimi-k3 --picker "glm-5.3:GLM-5.3:1M ctx · 适合长文"
     #
-    # --opus/--sonnet/--haiku  = opus/sonnet/haiku 三个别名解析到哪个真实模型
-    #                            （sonnet 是默认模型，haiku 给后台小任务用）
-    # --picker ID[:显示名[:说明]]  = 每用一次就往 Claude Code 的 /model 列表里加一行，
-    #                            可重复，书写顺序就是列表顺序；不写时列表只有 sonnet 那一行
-    #                            例: --picker deepseek-flash:V4.1 Flash:快、便宜
-    # --discover  自动问网关要模型列表并生成 picker 行
+    # 常见网关（opencode-go / opencode-free / minimax-cn / deepseek）已经内置成预设，
+    # 用 `setup --preset <名字>` 就行，不用手写 --picker；`add` 留给自建网关。
+    #
+    # --discover  自动问网关要模型列表（opencode 的 /v1/models 是 404，会退回你给的值）
     # --keep-builtin  保留内置 Opus/Sonnet/Haiku 行（默认 replaceBuiltInOptions=true）
 """
 from __future__ import annotations
