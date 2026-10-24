@@ -62,6 +62,12 @@ variable in the environment → an interactive prompt (no echo). When the key co
 from a variable, the profile stores **only the variable name**; the secret never
 enters the profile file or this repo.
 
+`--auth-var` / `--key-var` take the *name*, not the value: `--auth-var OPENCODE_GO_APIKEY`,
+**not** `--auth-var $OPENCODE_GO_APIKEY`. The `$` form expands to the secret, and the
+script spots it: it warns and treats the value as `--auth-token` instead of storing a
+literal key as a variable name. If the variable is unset, the shell drops the argument
+entirely and you get a message saying so.
+
 Adding a gateway by hand — OpenCode Go, with real values you can copy:
 
 ```sh
@@ -83,7 +89,7 @@ Any other Anthropic-compatible gateway only changes these four:
 | flag | what goes there |
 | --- | --- |
 | `--base-url` | `https://<your-gateway>/anthropic` |
-| `--auth-var` | env var holding the key, e.g. `MINIMAX`, `DEEPSEEK_API_KEY`, `MOONSHOT_API_KEY` |
+| `--auth-var` | **name** of the env var holding the key — no `$`: `MINIMAX`, `DEEPSEEK_API_KEY`, `OPENCODE_GO_APIKEY` |
 | `--opus/--sonnet/--haiku` | model ids that gateway really serves (`sonnet` is the default, `haiku` backs small internal calls) |
 | `--picker ID[:label[:description]]` | the `/model` rows, repeatable, in display order |
 

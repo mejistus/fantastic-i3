@@ -61,7 +61,8 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
 
     # 换成别的 Anthropic 兼容网关，只改这四项：
     #   --base-url             https://<你的网关>/anthropic
-    #   --auth-var             存 key 的环境变量名，例如 MINIMAX / DEEPSEEK_API_KEY / MOONSHOT_API_KEY
+    #   --auth-var             存 key 的变量名【不带 $】，例如 MINIMAX / DEEPSEEK_API_KEY / OPENCODE_GO_APIKEY
+    #                          写成 --auth-var $FOO 会把 key 的值当变量名（脚本会认出来并按 --auth-token 处理）
     #   --opus/--sonnet/--haiku  该网关真实存在的模型 id（sonnet 是默认模型，haiku 给后台小任务用）
     #   --picker ID[:显示名[:说明]]  /model 里显示哪些行，可重复，书写顺序即显示顺序
     #                         例: --picker kimi-k3 --picker "glm-5.3:GLM-5.3:1M ctx · 适合长文"
@@ -528,6 +529,62 @@ def cmd_unpatch(args) -> int:
     return 0
 
 
+SECRET_SHAPE = re.compile(
+    r"^(?:oc_sk_|sk-|ark-|hf_|ghp_|gho_|gsk_|xox[abps]-|AIza)[A-Za-z0-9_.\-]{6,}$", re.I
+)
+
+
+def looks_like_secret(value: str) -> bool:
+    """用户习惯性写 --auth-var $FOO，shell 把 $FOO 展开成 key 的值，这里认出来。"""
+    if not value:
+        return False
+    if SECRET_SHAPE.match(value):
+        return True
+    return bool(re.fullmatch(r"[A-Za-z0-9_.+/=\-]{40,}", value))
+
+
+def resolve_auth_input(args):
+    """--auth-token / --auth-env / --auth-var 统一解析成 (token, kind, name)。"""
+    if hasattr(args, "auth_var") and args.auth_var is None:
+        die(
+            "--auth-var 后面没有值：如果写的是 $FOO，说明这个变量在 shell 里是空的。\n"
+            "      变量名不带 $：--auth-var OPENCODE_GO_APIKEY（或 --auth-env 从环境读、--auth-token 直接给值）"
+        )
+    name = getattr(args, "auth_var", None)
+    if args.auth_token:
+        return args.auth_token, "token", None
+    if args.auth_env:
+        token = os.environ.get(args.auth_env)
+        if not token:
+            die(
+                f"环境变量 ${args.auth_env} 当前是空的。\n"
+                f"      先 export {args.auth_env}=...，或改成 --auth-var {args.auth_env}"
+            )
+        return token, "env", args.auth_env
+    if not name:
+        die(
+            "需要指定 key 来源：\n"
+            "      --auth-var <变量名>   例如 --auth-var OPENCODE_GO_APIKEY（不带 $）\n"
+            "      --auth-env <变量名>   从当前 shell 环境读\n"
+            "      --auth-token <key>    直接给值（会落盘，权限 600）"
+        )
+    if looks_like_secret(name):
+        print(f"warning: --auth-var 收到的是 key 的值（{mask(name)}），不是变量名。")
+        print("         这次按 --auth-token 处理；想只存变量名，写成 --auth-var OPENCODE_GO_APIKEY（去掉 $）")
+        return name, "token", None
+    token = zshrc_var(name)
+    if token:
+        return token, "var", name
+    token = os.environ.get(name)
+    if token:
+        return token, "env", name
+    die(
+        f"在 ~/.zshrc 和当前环境里都没有 ${name}。\n"
+        f"      变量名不带 $：--auth-var {name}\n"
+        f"      或者直接给值：--auth-token <key>"
+    )
+
+
 def cmd_presets(args) -> int:
     for name, preset in PRESETS.items():
         rows = len(preset.get("picker") or [])
@@ -545,7 +602,16 @@ def _resolve_key(args, default_var: str):
     """key 优先级: --key > ~/.zshrc 变量 > 同名环境变量 > 交互输入。"""
     if args.key:
         return args.key, "--key", None
-    var = args.key_var or default_var
+    if hasattr(args, "key_var") and args.key_var is None:
+        die(
+            "--key-var 后面没有值：如果写的是 $FOO，说明这个变量在当前 shell 里没设置/没 export。\n"
+            "      变量名不带 $，例如 --key-var OPENCODE_GO_APIKEY；不知道变量名就别写，脚本会用预设里的"
+        )
+    explicit = getattr(args, "key_var", None)
+    if explicit and looks_like_secret(explicit):
+        print(f"warning: --key-var 收到的是 key 的值（{mask(explicit)}），不是变量名；按 --key 处理")
+        return explicit, "手动输入", None
+    var = explicit or default_var
     token = zshrc_var(var) if var else None
     if token:
         return token, f"~/.zshrc 的 ${var}", var
@@ -561,7 +627,9 @@ def _resolve_key(args, default_var: str):
             die("已取消")
         if entered:
             return entered, "手动输入", None
-    die(f"取不到 key：先在 ~/.zshrc 里 export {var}=...，或加 --key/--key-var")
+    die(
+        f"取不到 key：在 ~/.zshrc 里 export {var}=...，或加 --key/--key-var {var}（变量名不带 $）"
+    )
 
 
 def cmd_setup(args) -> int:
@@ -747,15 +815,14 @@ def cmd_models(args) -> int:
 def cmd_add(args) -> int:
     name = args.name
     if profile_path(name).exists() and not args.force:
-        die(f"档案 {name!r} 已存在（用 --force 覆盖）")
+        extra = ""
+        if name in PRESETS:
+            extra = f"\n       {name!r} 是内置预设，其实不用 add：patch-claude-code setup --preset {name}"
+        die(f"档案 {name!r} 已存在（用 --force 覆盖，或换个名字）{extra}")
     if not re.match(r"^https?://", args.base_url):
         die("--base-url 必须以 http(s):// 开头")
 
-    token = args.auth_token or (os.environ.get(args.auth_env) if args.auth_env else None) or (
-        zshrc_var(args.auth_var) if args.auth_var else None
-    )
-    if not token:
-        die("需要 --auth-var / --auth-env / --auth-token 之一，且要能取到值")
+    token, auth_kind, auth_name = resolve_auth_input(args)
 
     rows = []
     if args.discover:
@@ -799,15 +866,17 @@ def cmd_add(args) -> int:
             "replaceBuiltInOptions": not args.keep_builtin,
         },
     }
-    if args.auth_token:
-        prof["auth_token"] = args.auth_token
-        print("warning: key 以明文写进档案；更推荐 --auth-var（存变量名）")
-    elif args.auth_var:
-        prof["auth_var"] = args.auth_var
+    if auth_kind == "var":
+        prof["auth_var"] = auth_name
+    elif auth_kind == "env":
+        prof["auth_env"] = auth_name
     else:
-        prof["auth_env"] = args.auth_env
+        prof["auth_token"] = token
+        print("warning: key 以明文写进档案（权限已设 600）；更推荐 --auth-var <变量名>")
 
     path = save_profile(name, prof)
+    if "auth_token" in prof:
+        path.chmod(0o600)
     print(f"created {path}")
     print(f"models  : opus={opus} sonnet={sonnet} haiku={haiku}")
     print(f"picker  : {len(rows)} rows, replaceBuiltInOptions={not args.keep_builtin}")
@@ -931,7 +1000,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--preset", help="预置网关名（见 `presets`）")
     s.add_argument("--name", help="档案名（默认同 preset）")
     s.add_argument("--key", help="直接给 key（不推荐，会落盘）")
-    s.add_argument("--key-var", help="key 所在变量名（默认用预设里的）")
+    s.add_argument(
+        "--key-var",
+        nargs="?",
+        metavar="VAR",
+        default=argparse.SUPPRESS,
+        help="key 所在变量名，不带 $（默认用预设里的）",
+    )
     s.add_argument("--discover", action="store_true", help="从网关拉模型列表生成 picker")
     s.add_argument("--keep-builtin", action="store_true", help="保留内置 Opus/Sonnet/Haiku 行")
     s.add_argument("--no-activate", action="store_true", help="只建档案，不写入 settings.json")
@@ -947,7 +1022,13 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("add", help="新建 provider 档案")
     s.add_argument("name")
     s.add_argument("--base-url", required=True, help="Anthropic 协议端点，如 https://api.deepseek.com/anthropic")
-    s.add_argument("--auth-var", help="从 ~/.zshrc 读的变量名（推荐）")
+    s.add_argument(
+        "--auth-var",
+        nargs="?",
+        metavar="VAR",
+        default=argparse.SUPPRESS,
+        help="变量名，不带 $（推荐），例如 OPENCODE_GO_APIKEY",
+    )
     s.add_argument("--auth-env", help="从当前进程环境变量读")
     s.add_argument("--auth-token", help="直接给明文 key（不推荐）")
     s.add_argument("--label")
