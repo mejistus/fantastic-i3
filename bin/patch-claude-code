@@ -45,9 +45,6 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
 前提：先用官方方式装好 Claude Code（npm i -g @anthropic-ai/claude-code，或官方原生安装包），
 本脚本只改它的 provider 配置，不改二进制，也不碰 ~/.claude 之外的任何东西。
 
-只提供 OpenAI 协议的模型（例如 OpenCode Go 里的免费 beam-free）用 `claude-code-proxy`
-转一层，再用 `setup --preset opencode-beam` 接上，详见 bin/README.md。
-
 新建 provider（以 OpenCode Go 为例，值是真的，可以直接抄）:
     patch-claude-code add opencode-go \\
         --base-url https://opencode.ai/inference/go/anthropic \\
@@ -141,20 +138,6 @@ PRESETS = {
             ("qwen3.8-max", "Qwen3.8 Max", "$2/$6 per Mtok · 1M ctx"),
         ],
         "note": "额度用尽时网关返回 402，不是配置问题",
-    },
-    "opencode-beam": {
-        "label": "OpenCode Go 套餐的免费模型 beam-free（不经 Anthropic 协议，走本地代理）",
-        "base_url": "http://127.0.0.1:8787",
-        "auth_token": "local-proxy",
-        "opus": "beam-free",
-        "sonnet": "beam-free",
-        "haiku": "beam-free",
-        "max_context": 1000000,
-        "note": "先启动代理：claude-code-proxy --upstream https://opencode.ai/inference/go/openai/v1 "
-                "--upstream-key-env OPENCODE_GO_APIKEY --model beam-free --token local-proxy",
-        "picker": [
-            ("beam-free", "Beam Free", "free · 1M ctx · Go 套餐 · 需本地代理"),
-        ],
     },
     "deepseek": {
         "label": "DeepSeek 官方（Anthropic 兼容端点 · 按 token 计费）",
@@ -798,9 +781,7 @@ def cmd_verify(args) -> int:
             403: "权限不足或地区限制",
             404: "base_url 路径不对（一般要带 /anthropic）",
         }.get(status)
-        if "FreeTierError" in body:
-            hint = "OpenCode 免费层只能在 OpenCode 客户端里用；这个端点从外部调不通"
-        elif "ModelProtocolUnsupported" in body:
+        if "ModelProtocolUnsupported" in body:
             hint = "该模型不支持 Anthropic 协议（只能走 OpenAI 协议），Claude Code 用不了"
         elif "ModelDeprecated" in body:
             hint = "该模型已下架"
