@@ -4,11 +4,12 @@ Point the official **Claude Code** client at a third-party, Anthropic-compatible
 gateway — one command, no binary patching.
 
 Claude Code reads its provider from `~/.claude/settings.json`. Switching gateways
-by hand means keeping six or seven keys in sync: `ANTHROPIC_BASE_URL`,
+by hand means keeping seven or eight keys in sync: `ANTHROPIC_BASE_URL`,
 `ANTHROPIC_AUTH_TOKEN`, the three `ANTHROPIC_DEFAULT_*_MODEL` aliases,
-`CLAUDE_CODE_MAX_CONTEXT_TOKENS`, plus `model` and the `modelPicker` rows that
-`/model` renders. This script packages that into named **provider profiles** and
-does the patching, verification and rollback for you.
+`CLAUDE_CODE_MAX_CONTEXT_TOKENS`, plus `model`, the `modelPicker` rows that
+`/model` renders, and the optional `fallbackModel` chain. This script packages
+that into named **provider profiles** and does the patching, verification and
+rollback for you.
 
 Python 3 standard library only. Nothing outside `~/.claude/` is touched.
 
@@ -74,6 +75,7 @@ patch-claude-code add opencode-go \
     --picker "deepseek-v4-pro:DeepSeek V4 Pro:$0.66/$1.98 per Mtok · 1M ctx" \
     --picker kimi-k3 \
     --picker glm-5.3 \
+    --fallback minimax-m3,qwen3.8-flash \
     --max-context 1000000 --verify --activate
 ```
 
@@ -85,6 +87,11 @@ Any other Anthropic-compatible gateway only changes these four:
 | `--auth-var` | **name** of the env var holding the key — no `$`: `MINIMAX`, `DEEPSEEK_API_KEY`, `OPENCODE_GO_APIKEY` |
 | `--opus/--sonnet/--haiku` | model ids that gateway really serves (`sonnet` is the default, `haiku` backs small internal calls) |
 | `--picker ID[:label[:description]]` | the `/model` rows, repeatable, in display order |
+
+`--fallback a,b` (or repeated, up to three) writes Claude Code's `fallbackModel`
+chain: when the primary returns a non-retryable error such as an upstream 400,
+Claude Code retries the same turn on the next model and returns to the primary
+at the start of the next user turn.
 
 `--discover` asks the gateway for its model list (`/v1/models`, then `/models`)
 and builds the `/model` rows from it — OpenCode answers 404 there, so it falls
@@ -101,7 +108,38 @@ patch-claude-code models <name> --apply   # refresh picker rows from the gateway
 patch-claude-code repair             # re-apply after hand-editing settings.json
 patch-claude-code unpatch            # remove the patch, back to official endpoints
 patch-claude-code revert             # roll back to the newest backup
+patch-claude-code run --profile opencode-go   # start Claude Code behind the retry proxy
 ```
+
+## Retry proxy (OpenCode Go's opaque 400s)
+
+OpenCode Go sometimes answers
+
+```
+400 {"model":"deepseek-v4.1-flash"}
+```
+
+with no error text — it drops the upstream body (`opencode#53243`, `#54996`). The
+same request usually succeeds on a retry, so `run` starts a local proxy for the
+lifetime of one Claude Code process and transparently retries:
+
+```sh
+patch-claude-code run --profile opencode-go            # interactive TUI
+patch-claude-code run --profile opencode-go -p "hi"    # one-shot, any claude flag works
+patch-claude-code run --profile opencode-go -- --resume <id>
+```
+
+- Only `400` whose body is exactly `{"model": ...}` (or empty), plus `408/429/5xx`, are retried.
+- The first retry keeps the same session id (prompt cache stays warm); later retries
+  rotate `x-opencode-session` / `X-Claude-Code-Session-Id` to escape a bad route.
+- `ANTHROPIC_BASE_URL` is overridden per-process with `--settings` — `settings.json`
+  is not modified, no daemon, and the proxy dies with Claude Code.
+- `--no-fallback` clears `fallbackModel` for the session, so a request that still
+  fails after retries errors out instead of silently switching models.
+- Attempts are logged to `~/.claude/proxy.log` with the gateway's
+  `x-opencode-log-id`, which is what OpenCode support asks for.
+
+Run the proxy alone (for another Anthropic client) with `patch-claude-code proxy`.
 
 ## Notes
 
@@ -115,6 +153,12 @@ patch-claude-code revert             # roll back to the newest backup
   configured. Add `--keep-builtin` to append them after the built-in
   Opus/Sonnet/Haiku rows instead.
 - A `402 Insufficient account funds` from a gateway is billing, not config.
+- OpenCode Go's Anthropic endpoint occasionally answers `400 {"model":"deepseek-v4.1-flash"}`
+  — the gateway drops the upstream error body, so the real cause is invisible. The
+  request often succeeds when retried. The `opencode-go` preset ships
+  `fallbackModel: ["minimax-m3", "qwen3.8-flash"]`, so Claude Code switches models
+  for that turn instead of failing. Use `patch-claude-code use deepseek` to avoid
+  that gateway entirely if it becomes frequent.
 - OpenCode's free tier is gated server-side to the OpenCode client itself: from
   anywhere else it answers `403 FreeTierError`. There is deliberately no preset
   for it — it cannot work as a Claude Code gateway.
@@ -134,3 +178,18 @@ patch-claude-code setup --preset minimax-cn   # MiniMax 编码套餐
 key 优先从 `~/.zshrc` 的变量读，只把变量名写进档案，不落地明文；每次改
 `settings.json` 都先备份到 `~/.claude/backups/`，`unpatch` 可整体撤销。
 档案在 `~/.claude/profiles/`，不进仓库。
+
+OpenCode Go 的 `deepseek-v4.1-flash` 会偶发 `400 {"model":"deepseek-v4.1-flash"}`
+（网关吞掉上游错误正文，重试通常能过）。`opencode-go` 预设已配
+`fallbackModel: minimax-m3, qwen3.8-flash`，Claude Code 会在那一回合自动换模型；
+嫌频繁就 `patch-claude-code use deepseek` 直接走 DeepSeek 官方端点。
+
+更推荐用带重试代理的方式启动，既保留 DeepSeek 又不用切模型：
+
+```sh
+patch-claude-code run --profile opencode-go        # 交互 TUI
+patch-claude-code run --profile opencode-go -p "hi"
+```
+
+代理只活到这次 Claude Code 退出，不改 `settings.json`；重试记录在
+`~/.claude/proxy.log`（含网关的 `x-opencode-log-id`）。
