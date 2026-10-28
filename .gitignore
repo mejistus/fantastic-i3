@@ -22,6 +22,6 @@ crash.log
 *.conf_*
 
 
-# Python bytecode (bin/patch-claude-code)
+# Python bytecode
 __pycache__/
 *.pyc
