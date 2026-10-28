@@ -43,7 +43,7 @@ i3 on X11 with polybar, rofi, kitty, picom, dunst, conky and NvChad, all in one 
 
 ## macOS: yabai
 
-The same habits on macOS: yabai tiles windows, skhd handles the keys and SketchyBar replaces the menu bar. There are 17 workspaces, a window switcher with pinyin search, and per-app layout and workspace memory. It lives in its own repo, [fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app), and installs with Homebrew on Apple Silicon:
+The same habits on macOS: yabai tiles windows, skhd handles the keys and SketchyBar replaces the menu bar. There are 17 workspaces, a window switcher with pinyin search, and per-app layout and workspace memory. It lives in the `macos` submodule, [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS), and installs with Homebrew on Apple Silicon:
 
 ```sh
 brew install mejistus/mona/fantastic-i3
@@ -52,7 +52,7 @@ fantastic-i3 setup
 
 `setup` is safe to rerun. At the end it lists what's left to do by hand and prints a key cheat sheet worth a screenshot.
 
-The macOS extras (small tools, kitty, the shared tmux config) are in [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS), included here as the `macos` submodule. Its one-line installer sets up all of it, Homebrew and the tiling desktop included:
+The `macos` submodule also carries the small tools and configs (brew-tree, kitty, AeroSpace, the shared tmux config). Its one-line installer sets up all of it, Homebrew and the tiling desktop included:
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"
@@ -78,7 +78,7 @@ The macOS extras (small tools, kitty, the shared tmux config) are in [fantastic-
 | <kbd>⌥⇧V</kbd> | Clipboard history, searchable |
 | <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | Screenshot → text / LaTeX formula, copied |
 
-All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app)**.
+All the keys, fixed workspaces, the top bar, instant switching and troubleshooting: **[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS)**.
 
 ## Credits
 

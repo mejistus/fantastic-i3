@@ -43,7 +43,7 @@ X11 上的 i3，配 polybar、rofi、kitty、picom、dunst、conky 和 NvChad，
 
 ## macOS: yabai
 
-在 macOS 上沿用同一套习惯：yabai 平铺窗口，skhd 管快捷键，SketchyBar 代替菜单栏。有 17 个工作区、能用拼音搜索的窗口切换器，还能按应用记住布局和工作区。它是单独的仓库 [fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app/blob/main/README.zh-CN.md)，Apple Silicon 上用 Homebrew 装：
+在 macOS 上沿用同一套习惯：yabai 平铺窗口，skhd 管快捷键，SketchyBar 代替菜单栏。有 17 个工作区、能用拼音搜索的窗口切换器，还能按应用记住布局和工作区。它在子模块 `macos`（[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)）里，Apple Silicon 上用 Homebrew 装：
 
 ```sh
 brew install mejistus/mona/fantastic-i3
@@ -52,7 +52,7 @@ fantastic-i3 setup
 
 `setup` 可以重复运行。最后会列出还要手动做的事，再打印一张快捷键表，建议截图保存。
 
-macOS 上的其它东西（小工具、kitty、共用的 tmux 配置）在 [fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)，在这里是子模块 `macos`。它的一键安装把这些连同 Homebrew 和平铺桌面一起装好：
+子模块 `macos` 里还有小工具和配置（brew-tree、kitty、AeroSpace、共用的 tmux 配置）。它的一键安装把这些连同 Homebrew 和平铺桌面一起装好：
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mejistus/fantastic-i3-macOS/main/install.sh)"
@@ -78,7 +78,7 @@ macOS 上的其它东西（小工具、kitty、共用的 tmux 配置）在 [fant
 | <kbd>⌥⇧V</kbd> | 剪贴板历史，能搜索 |
 | <kbd>⌥O</kbd> / <kbd>⌥I</kbd> | 截图识字 / 截图识公式（LaTeX），复制到剪贴板 |
 
-全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-app](https://github.com/mejistus/fantastic-i3-app/blob/main/README.zh-CN.md)**。
+全部快捷键、固定工作区、顶栏、瞬间切换和排错：**[fantastic-i3-macOS](https://github.com/mejistus/fantastic-i3-macOS/blob/main/README.zh-CN.md)**。
 
 ## 致谢
 
