@@ -8,7 +8,6 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
   model                       （默认别名 sonnet/opus/default）
   modelPicker.options[]       （/model 里显示哪些模型，含 label/description/behavesAs）
   modelPicker.replaceBuiltInOptions（true = 只显示 Default + 你列的行）
-  fallbackModel[]             （主模型 400/过载时自动换的备用模型，按顺序试）
 
 本脚本把这些打包成 provider 档案，并负责打补丁 / 回滚 / 探活 / 从网关发现模型。
 
@@ -38,6 +37,8 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
     patch-claude-code run [--profile N] [--] <claude args>
                                                # 起本地重试代理再启动 Claude Code
     patch-claude-code proxy [--port 8790]      # 只起代理（前台），供别的客户端用
+    patch-claude-code daemon install [--profile N]   # 一次性：常驻签名/重试代理
+    patch-claude-code daemon status | uninstall      # 查看 / 卸载（恢复直连）
 
 一键上手（推荐给刚装好 Claude Code 的人）:
     patch-claude-code presets                       # 先看有哪些内置网关
@@ -76,18 +77,25 @@ Claude Code 走第三方网关时，需要同时改这些东西才对得上：
     #
     # --discover  自动问网关要模型列表（opencode 的 /v1/models 是 404，会退回你给的值）
     # --keep-builtin  保留内置 Opus/Sonnet/Haiku 行（默认 replaceBuiltInOptions=true）
-    # --fallback 主模型挂掉时自动切换的备用模型；可写 `a,b` 或重复多次，最多 3 个
+    # --fallback 可选：主模型失败时换备用模型。默认不配——DeepSeek 的 thinking
+    #   会话混入别的模型的回合后，会被 "thinking must be passed back" 拒绝。
     #
-    # OpenCode Go 的 /anthropic 端点上，deepseek-v4.1-flash 偶尔返回
-    # `400 {"model":"deepseek-v4.1-flash"}`（网关吞掉了上游 400 的正文，属于 Go 的已知问题）。
-    # 配好 fallbackModel 后 Claude Code 会自动换到备用模型，下一个用户回合再回主模型。
+    # OpenCode Go / DeepSeek 要求 thinking 块原样回传；Claude Code 会丢掉没有
+    # signature 的 thinking 块，导致偶发 `400 {"model":"..."}`。opencode-go /
+    # deepseek 预设默认写 CLAUDE_CODE_DISABLE_THINKING=1（直接 claude 稳定但无 thinking）。
+    # 需要 thinking 时用 `patch-claude-code run`（临时）或
+    # `patch-claude-code daemon install`（一次性，之后直接 claude）：
+    # 它们把该值改回 0，并由本地代理给网关缺失的 thinking 块补 signature，
+    # Claude Code 才会原样回传。`setup --thinking` 也可以全局打开，但直连会重现 400。
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import http.server
 import json
 import os
+import plistlib
 import re
 import shutil
 import socketserver
@@ -106,6 +114,8 @@ SETTINGS = CLAUDE_DIR / "settings.json"
 PROFILE_DIR = CLAUDE_DIR / "profiles"
 BACKUP_DIR = CLAUDE_DIR / "backups"
 PROXY_LOG = CLAUDE_DIR / "proxy.log"
+PROXY_LABEL = "dev.patch-claude-code.proxy"
+LAUNCH_AGENT_DIR = Path.home() / "Library" / "LaunchAgents"
 
 # 打补丁时由脚本接管、每次都要整体重写的 env 键
 MANAGED_ENV = (
@@ -117,6 +127,7 @@ MANAGED_ENV = (
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "CLAUDE_CODE_MAX_CONTEXT_TOKENS",
     "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
+    "CLAUDE_CODE_DISABLE_THINKING",
 )
 
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -145,6 +156,7 @@ PRESETS = {
         "sonnet": "deepseek-v4.1-flash",
         "haiku": "deepseek-v4.1-flash",
         "max_context": 1000000,
+        "disable_thinking": True,
         "picker": [
             ("deepseek-v4.1-flash", "DeepSeek V4.1 Flash", "$0.15/$0.6 per Mtok · 1M ctx"),
             ("deepseek-v4-pro", "DeepSeek V4 Pro", "$0.66/$1.98 per Mtok · 1M ctx"),
@@ -167,6 +179,7 @@ PRESETS = {
         "sonnet": "deepseek-v4-pro",
         "haiku": "deepseek-flash",
         "max_context": 1000000,
+        "disable_thinking": True,
         "picker": [
             ("deepseek-v4-pro", "DeepSeek V4 Pro", "direct API · 1M ctx"),
             ("deepseek-flash", "DeepSeek V4.1 Flash", "direct API · 1M ctx · fast"),
@@ -281,6 +294,13 @@ def alias_target(prof: dict, model: str):
     return (prof.get("env") or {}).get(key) if key else None
 
 
+def _effective_base(prof: dict) -> "str | None":
+    proxy = prof.get("proxy") or {}
+    if proxy.get("port"):
+        return f"http://127.0.0.1:{proxy['port']}"
+    return (prof.get("env") or {}).get("ANTHROPIC_BASE_URL")
+
+
 def active_profile():
     try:
         settings = load_json(SETTINGS, {}) or {}
@@ -298,7 +318,7 @@ def active_profile():
     for name, path in profiles().items():
         prof = load_json(path, {}) or {}
         p_env = prof.get("env") or {}
-        if p_env.get("ANTHROPIC_BASE_URL") != base:
+        if _effective_base(prof) != base:
             continue
         score = 0
         if prof.get("model") == s_model:
@@ -338,6 +358,9 @@ def build_settings(prof: dict, current: dict) -> dict:
     settings = json.loads(json.dumps(current))  # deep copy
     env = {k: v for k, v in (settings.get("env") or {}).items() if k not in MANAGED_ENV}
     env.update({k: str(v) for k, v in (prof.get("env") or {}).items()})
+    proxy = prof.get("proxy") or {}
+    if proxy.get("port"):
+        env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{proxy['port']}"
     token, _ = resolve_auth(prof)
     env["ANTHROPIC_AUTH_TOKEN"] = token
     settings["env"] = dict(sorted(env.items()))
@@ -362,6 +385,8 @@ def apply_profile(name: str, dry_run: bool = False, quiet: bool = False) -> dict
         "profile": name,
         "label": prof.get("label", ""),
         "base_url": settings["env"].get("ANTHROPIC_BASE_URL"),
+        "upstream": _upstream_of(prof),
+        "proxy": (prof.get("proxy") or {}).get("port"),
         "default_model": settings.get("model"),
         "opus": settings["env"].get("ANTHROPIC_DEFAULT_OPUS_MODEL"),
         "sonnet": settings["env"].get("ANTHROPIC_DEFAULT_SONNET_MODEL"),
@@ -397,6 +422,8 @@ def apply_profile(name: str, dry_run: bool = False, quiet: bool = False) -> dict
 def print_summary(r: dict) -> None:
     print(f"active profile    : {r['profile']}" + (f"  ({r['label']})" if r.get("label") else ""))
     print(f"ANTHROPIC_BASE_URL: {r['base_url']}")
+    if r.get("proxy"):
+        print(f"upstream          : {r.get('upstream')}  (via local proxy :{r['proxy']})")
     print(f"models            : model={r['default_model']}  opus={r['opus']}  sonnet={r['sonnet']}  haiku={r['haiku']}")
     print(f"fallback          : " + (", ".join(r.get("fallback") or []) or "—"))
     print(f"max context       : {r['max_context']}")
@@ -460,6 +487,20 @@ def _proxy_log(line: str) -> None:
         pass
 
 
+def _fake_signature() -> str:
+    return base64.b64encode(f"patch-claude-code:{uuid.uuid4().hex}".encode()).decode()
+
+
+def _sign_message(doc: dict) -> bool:
+    """给没有 signature 的 thinking 块补一个（非流式响应）。"""
+    changed = False
+    for block in doc.get("content") or []:
+        if isinstance(block, dict) and block.get("type") == "thinking" and not block.get("signature"):
+            block["signature"] = _fake_signature()
+            changed = True
+    return changed
+
+
 def make_proxy_server(upstream: str, retries: int, port: int = 0):
     upstream = upstream.rstrip("/")
 
@@ -479,18 +520,76 @@ def make_proxy_server(upstream: str, retries: int, port: int = 0):
             if self.command != "HEAD":
                 self.wfile.write(body)
 
+        def _chunk(self, data: bytes):
+            self.wfile.write(f"{len(data):X}\r\n".encode() + data + b"\r\n")
+            self.wfile.flush()
+
+        def _sse(self, event, payload):
+            line = f"event: {event}\ndata: {json.dumps(payload)}\n\n".encode()
+            self._chunk(line)
+
         def _stream(self, resp):
+            ctype = resp.headers.get("content-type", "application/octet-stream")
+            if "text/event-stream" not in ctype:
+                data = resp.read()
+                if "json" in ctype:
+                    try:
+                        doc = json.loads(data)
+                        if isinstance(doc, dict) and _sign_message(doc):
+                            data = json.dumps(doc).encode()
+                    except json.JSONDecodeError:
+                        pass
+                self.send_response(resp.status)
+                for key in ("content-type", "request-id", "x-opencode-log-id"):
+                    if resp.headers.get(key):
+                        self.send_header(key, resp.headers[key])
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(data)
+                return
             self.send_response(resp.status)
-            self.send_header("content-type", resp.headers.get("content-type", "application/octet-stream"))
+            self.send_header("content-type", ctype)
             self.send_header("transfer-encoding", "chunked")
             self.end_headers()
+            thinking = {}  # index -> 是否已经带 signature
+            event = None
+            data = None
             try:
-                while True:
-                    chunk = resp.read(8192)
-                    if not chunk:
-                        break
-                    self.wfile.write(f"{len(chunk):X}\r\n".encode() + chunk + b"\r\n")
-                    self.wfile.flush()
+                for raw in resp:
+                    line = raw.rstrip(b"\r\n")
+                    if not line:
+                        if data is not None:
+                            try:
+                                payload = json.loads(data)
+                            except json.JSONDecodeError:
+                                self._chunk(f"event: {event or 'message'}\ndata: {data}\n\n".encode())
+                                event, data = None, None
+                                continue
+                            kind = payload.get("type")
+                            idx = payload.get("index")
+                            if kind == "content_block_start":
+                                block = payload.get("content_block") or {}
+                                if block.get("type") == "thinking":
+                                    thinking[idx] = bool(block.get("signature"))
+                            elif kind == "content_block_delta":
+                                if (payload.get("delta") or {}).get("type") == "signature_delta":
+                                    thinking[idx] = True
+                            elif kind == "content_block_stop" and idx in thinking and not thinking[idx]:
+                                # Go 网关不给 thinking 签名；补一个，Claude Code 才会回传
+                                self._sse("content_block_delta", {
+                                    "type": "content_block_delta",
+                                    "index": idx,
+                                    "delta": {"type": "signature_delta", "signature": _fake_signature()},
+                                })
+                                thinking[idx] = True
+                            self._sse(event or kind or "message", payload)
+                        event, data = None, None
+                        continue
+                    if line.startswith(b"event:"):
+                        event = line[6:].strip().decode()
+                    elif line.startswith(b"data:"):
+                        data = line[5:].strip().decode()
                 self.wfile.write(b"0\r\n\r\n")
             except (BrokenPipeError, ConnectionResetError):
                 pass
@@ -502,9 +601,17 @@ def make_proxy_server(upstream: str, retries: int, port: int = 0):
             n = int(self.headers.get("content-length") or 0)
             body = self.rfile.read(n) if n else b""
             model = None
+            think = signed = 0
             if body:
                 try:
-                    model = json.loads(body).get("model")
+                    doc = json.loads(body)
+                    model = doc.get("model")
+                    for msg in doc.get("messages") or []:
+                        for blk in msg.get("content") or []:
+                            if isinstance(blk, dict) and blk.get("type") == "thinking":
+                                think += 1
+                                if blk.get("signature"):
+                                    signed += 1
                 except (json.JSONDecodeError, AttributeError):
                     pass
             headers0 = {
@@ -527,7 +634,7 @@ def make_proxy_server(upstream: str, retries: int, port: int = 0):
                 try:
                     with urllib.request.urlopen(req, timeout=900, context=ssl.create_default_context()) as resp:
                         _proxy_log(
-                            f"{self.command} {self.path} model={model} attempt={attempt} status={resp.status} "
+                            f"{self.command} {self.path} model={model} think={think}/{signed} attempt={attempt} status={resp.status} "
                             f"log_id={resp.headers.get('x-opencode-log-id') or '-'}"
                         )
                         self._stream(resp)
@@ -543,7 +650,7 @@ def make_proxy_server(upstream: str, retries: int, port: int = 0):
                         or missing_session
                     )
                     _proxy_log(
-                        f"{self.command} {self.path} model={model} attempt={attempt} status={exc.code} "
+                        f"{self.command} {self.path} model={model} think={think}/{signed} attempt={attempt} status={exc.code} "
                         f"retry={'yes' if retry else 'no'} log_id={exc.headers.get('x-opencode-log-id') or '-'} "
                         f"body={err[:120].decode('utf-8', 'replace').replace(chr(10), ' ')}"
                     )
@@ -576,8 +683,9 @@ def make_proxy_server(upstream: str, retries: int, port: int = 0):
 
 
 def _upstream_of(prof: dict) -> str:
+    proxy = prof.get("proxy") or {}
     env = prof.get("env") or {}
-    upstream = env.get("upstream_base_url") or env.get("ANTHROPIC_BASE_URL")
+    upstream = proxy.get("upstream") or env.get("upstream_base_url") or env.get("ANTHROPIC_BASE_URL")
     if not upstream:
         die("档案里没有 ANTHROPIC_BASE_URL")
     if re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?", upstream):
@@ -605,6 +713,147 @@ def cmd_proxy(args) -> int:
     return 0
 
 
+# ------------------------------------------------------------ launchd daemon
+def _launchctl(*args):
+    try:
+        return subprocess.run(["launchctl", *args], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        die(f"launchctl {' '.join(args)} 失败: {exc}")
+
+
+def _proxy_health(port: int, timeout: float = 1.0) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/__health", timeout=timeout) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
+def _plist_path() -> Path:
+    return LAUNCH_AGENT_DIR / f"{PROXY_LABEL}.plist"
+
+
+def _daemon_install(name: str, port: int, retries: int) -> int:
+    if sys.platform != "darwin":
+        die("daemon 目前只支持 macOS launchd；其他系统用 `patch-claude-code proxy` 配合 systemd")
+    prof = load_profile(name)
+    upstream = _upstream_of(prof)
+    if re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?", upstream):
+        die("档案的 base_url 已经指向本地地址，找不到真实上游")
+    prof["proxy"] = {"port": port, "upstream": upstream}
+    # 常驻代理会补 signature，所以这里重新打开 thinking
+    prof["env"].pop("CLAUDE_CODE_DISABLE_THINKING", None)
+    prof.pop("fallbackModel", None)
+    save_profile(name, prof)
+
+    args = [
+        os.path.realpath(sys.executable),
+        str(Path(__file__).resolve()),
+        "proxy",
+        "--profile", name,
+        "--port", str(port),
+        "--retries", str(retries),
+    ]
+    plist = {
+        "Label": PROXY_LABEL,
+        "ProgramArguments": args,
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "ProcessType": "Background",
+        "StandardOutPath": str(CLAUDE_DIR / "proxy-daemon.log"),
+        "StandardErrorPath": str(CLAUDE_DIR / "proxy-daemon.err.log"),
+    }
+    LAUNCH_AGENT_DIR.mkdir(parents=True, exist_ok=True)
+    path = _plist_path()
+    with path.open("wb") as fh:
+        plistlib.dump(plist, fh)
+    path.chmod(0o644)
+
+    uid = os.getuid()
+    _launchctl("bootout", f"gui/{uid}", str(path))
+    res = _launchctl("bootstrap", f"gui/{uid}", str(path))
+    if res.returncode != 0:
+        path.unlink(missing_ok=True)
+        prof.pop("proxy", None)
+        save_profile(name, prof)
+        die(f"launchctl bootstrap 失败: {res.stderr.strip()[:300]}")
+    _launchctl("kickstart", "-k", f"gui/{uid}/{PROXY_LABEL}")
+    for _ in range(40):
+        if _proxy_health(port):
+            break
+        time.sleep(0.25)
+    else:
+        _launchctl("bootout", f"gui/{uid}", str(path))
+        path.unlink(missing_ok=True)
+        prof.pop("proxy", None)
+        save_profile(name, prof)
+        die(f"代理没有起来；看 {CLAUDE_DIR / 'proxy-daemon.err.log'}")
+    apply_profile(name)
+    print(f"daemon  : {PROXY_LABEL}  :{port} -> {upstream}")
+    print(f"plist   : {path}")
+    print(f"log     : {PROXY_LOG}")
+    print("下次直接运行 `claude` 即可：thinking 已开启，thinking 块会自动补 signature")
+    return 0
+
+
+def _daemon_uninstall(name: "str | None") -> int:
+    if sys.platform != "darwin":
+        die("daemon 目前只支持 macOS launchd")
+    active = active_profile()
+    path = _plist_path()
+    if path.exists():
+        _launchctl("bootout", f"gui/{os.getuid()}", str(path))
+        path.unlink()
+    removed = []
+    for prof_name in ([name] if name else list(profiles())):
+        prof = load_profile(prof_name)
+        if not prof.get("proxy"):
+            continue
+        prof.pop("proxy", None)
+        # 回到直连时重新关掉 thinking，否则又会撞上 thinking pass-back
+        prof.setdefault("env", {})["CLAUDE_CODE_DISABLE_THINKING"] = "1"
+        save_profile(prof_name, prof)
+        removed.append(prof_name)
+    if active and active in removed:
+        apply_profile(active)
+    print("已卸载 daemon；恢复直连: " + (", ".join(removed) or "(无)"))
+    if active and active in removed:
+        print("直接 `claude` 现在是无 thinking 的稳定模式；要 thinking 用 `patch-claude-code daemon install`")
+    return 0
+
+
+def _daemon_status() -> int:
+    path = _plist_path()
+    print(f"plist   : {path}  {'存在' if path.exists() else '不存在'}")
+    if sys.platform == "darwin":
+        res = _launchctl("print", f"gui/{os.getuid()}/{PROXY_LABEL}")
+        print(f"launchd : {'running' if res.returncode == 0 else 'not loaded'}")
+    name = active_profile()
+    if not name:
+        print("profile : 未托管")
+        return 1
+    prof = load_profile(name)
+    proxy = prof.get("proxy") or {}
+    if proxy:
+        print(f"profile : {name}  :{proxy['port']} -> {proxy.get('upstream')}")
+        print(f"health  : {'ok' if _proxy_health(proxy['port']) else 'down'}")
+    else:
+        print(f"profile : {name}  (direct)")
+    return 0
+
+
+def cmd_daemon(args) -> int:
+    action = args.action
+    if action == "status":
+        return _daemon_status()
+    name = args.profile or active_profile()
+    if not name:
+        die("没有生效档案；用 --profile 指定")
+    if action == "install":
+        return _daemon_install(name, args.port, args.retries)
+    return _daemon_uninstall(args.profile)
+
+
 def cmd_run(args) -> int:
     if getattr(args, "upstream", None):
         upstream = args.upstream
@@ -622,8 +871,13 @@ def cmd_run(args) -> int:
         server.shutdown()
         die("没找到 claude；先装官方 Claude Code")
     override = {
-        "env": {"ANTHROPIC_BASE_URL": f"http://127.0.0.1:{port}"},
-        # 明确禁止换模型：Go/DeepSeek 的 thinking 会话混入别的模型的回合后，
+        "env": {
+            "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{port}",
+            # 全局设 1 是为了让直接 claude 稳定；run 默认把它改回 0 重新开 thinking，
+            # 由代理给 Go 网关缺失的 thinking 块补 signature。
+            "CLAUDE_CODE_DISABLE_THINKING": "1" if getattr(args, "no_thinking", False) else "0",
+        },
+        # 明确禁止换模型：DeepSeek 的 thinking 会话混入别的模型的回合后，
         # 下个回合会被 "thinking must be passed back" 拒绝
         "fallbackModel": [],
     }
@@ -734,20 +988,23 @@ def cmd_current(args) -> int:
         base = (settings.get("env") or {}).get("ANTHROPIC_BASE_URL")
         print(f"未托管（{base or '没有 ANTHROPIC_BASE_URL'}）")
         return 0
+    prof = load_profile(cur)
     print(cur)
     print_summary(
         {
             "profile": cur,
-            "label": load_profile(cur).get("label", ""),
-            "base_url": (load_profile(cur).get("env") or {}).get("ANTHROPIC_BASE_URL"),
-            "default_model": load_profile(cur).get("model"),
-            "opus": resolve_env(cur, "ANTHROPIC_DEFAULT_OPUS_MODEL"),
-            "sonnet": resolve_env(cur, "ANTHROPIC_DEFAULT_SONNET_MODEL"),
-            "haiku": resolve_env(cur, "ANTHROPIC_DEFAULT_HAIKU_MODEL"),
-            "max_context": resolve_env(cur, "CLAUDE_CODE_MAX_CONTEXT_TOKENS"),
-            "picker_rows": len((load_profile(cur).get("modelPicker") or {}).get("options") or []),
-            "replace_builtin": (load_profile(cur).get("modelPicker") or {}).get("replaceBuiltInOptions"),
-            "fallback": load_profile(cur).get("fallbackModel") or [],
+            "label": prof.get("label", ""),
+            "base_url": _effective_base(prof),
+            "upstream": _upstream_of(prof),
+            "proxy": (prof.get("proxy") or {}).get("port"),
+            "default_model": prof.get("model"),
+            "opus": (prof.get("env") or {}).get("ANTHROPIC_DEFAULT_OPUS_MODEL"),
+            "sonnet": (prof.get("env") or {}).get("ANTHROPIC_DEFAULT_SONNET_MODEL"),
+            "haiku": (prof.get("env") or {}).get("ANTHROPIC_DEFAULT_HAIKU_MODEL"),
+            "max_context": (prof.get("env") or {}).get("CLAUDE_CODE_MAX_CONTEXT_TOKENS"),
+            "picker_rows": len((prof.get("modelPicker") or {}).get("options") or []),
+            "replace_builtin": (prof.get("modelPicker") or {}).get("replaceBuiltInOptions"),
+            "fallback": prof.get("fallbackModel") or [],
         }
     )
     return 0
@@ -987,6 +1244,7 @@ def cmd_setup(args) -> int:
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": preset["haiku"],
             "CLAUDE_CODE_MAX_CONTEXT_TOKENS": str(preset["max_context"]),
             "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+            **({"CLAUDE_CODE_DISABLE_THINKING": "1"} if preset.get("disable_thinking") and not args.thinking else {}),
         },
         "model": "sonnet",
         "modelPicker": {"options": options, "replaceBuiltInOptions": not args.keep_builtin},
@@ -1054,12 +1312,12 @@ def cmd_verify(args) -> int:
         die("没有生效档案，请指定名字")
     prof = load_profile(name)
     token, src = resolve_auth(prof)
-    base = (prof.get("env") or {}).get("ANTHROPIC_BASE_URL", "").rstrip("/")
+    base = _upstream_of(prof).rstrip("/")
     model = args.model or (prof.get("env") or {}).get("ANTHROPIC_DEFAULT_SONNET_MODEL")
     if not model:
         die("档案里没有 sonnet 模型，用 --model 指定")
     print(f"profile : {name} ({src})")
-    print(f"endpoint: {base}/v1/messages")
+    print(f"endpoint: {base}/v1/messages  (直连上游，不经过本地代理)")
     print(f"model   : {model}")
     # OpenCode Go 现在要求带会话头才路由；Claude Code 自己会发，探活这里补一个。
     session = None
@@ -1178,6 +1436,8 @@ def cmd_add(args) -> int:
     }
     if not args.allow_betas:
         env["CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS"] = "1"
+    if args.no_thinking:
+        env["CLAUDE_CODE_DISABLE_THINKING"] = "1"
 
     prof = {
         "label": args.label or name,
@@ -1315,6 +1575,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--backup")
     s.set_defaults(func=cmd_revert)
 
+    s = sub.add_parser("daemon", help="把签名/重试代理装成 launchd 常驻服务（macOS）")
+    s.add_argument("action", choices=("install", "uninstall", "status"))
+    s.add_argument("--profile")
+    s.add_argument("--port", type=int, default=8790)
+    s.add_argument("--retries", type=int, default=4)
+    s.set_defaults(func=cmd_daemon)
+
     s = sub.add_parser("proxy", help="本地重试代理（前台）：吃掉偶发的 400/model 错误")
     s.add_argument("--profile")
     s.add_argument("--upstream", help="直接指定真实网关地址（默认取档案的 base_url）")
@@ -1343,6 +1610,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--discover", action="store_true", help="从网关拉模型列表生成 picker")
     s.add_argument("--keep-builtin", action="store_true", help="保留内置 Opus/Sonnet/Haiku 行")
+    s.add_argument("--thinking", action="store_true", help="保留扩展思考（DeepSeek 可能报 thinking must be passed back）")
     s.add_argument("--no-activate", action="store_true", help="只建档案，不写入 settings.json")
     s.add_argument("--no-verify", action="store_true", help="跳过探活")
     s.add_argument("--force", action="store_true", help="覆盖同名档案 / 忽略 claude 未安装")
@@ -1381,6 +1649,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--discover", action="store_true", help="自动发现模型并生成 picker 行")
     s.add_argument("--keep-builtin", action="store_true", help="保留内置 Opus/Sonnet/Haiku 行")
     s.add_argument("--allow-betas", action="store_true", help="不设 CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS")
+    s.add_argument("--no-thinking", action="store_true", help="设 CLAUDE_CODE_DISABLE_THINKING=1（DeepSeek 建议）")
     s.add_argument("--verify", action="store_true", help="创建后立即探活")
     s.add_argument("--activate", action="store_true", help="创建后立即生效")
     s.add_argument("--force", action="store_true", help="覆盖同名档案")
@@ -1395,7 +1664,7 @@ def main(argv=None) -> int:
         upstream = None
         port = 0
         retries = 4
-        no_fallback = False
+        no_thinking = False
         i = 1
         while i < len(argv):
             a = argv[i]
@@ -1404,10 +1673,11 @@ def main(argv=None) -> int:
                 break
             if a in ("-h", "--help"):
                 print(
-                    "usage: patch-claude-code run [--profile NAME] [--upstream URL] [--port N] [--retries N] [--no-fallback] [--] <claude args>\n"
+                    "usage: patch-claude-code run [--profile NAME] [--upstream URL] [--port N] [--retries N] [--no-thinking] [--] <claude args>\n"
                     "起一个只活到本次 Claude Code 退出的本地重试代理：\n"
                     "偶发 400 {\"model\":...}（Go 网关吞掉上游正文）时自动重试并换会话 id。\n"
-                    "--no-fallback 本次不改用备用模型（重试仍失败就直接报错）。\n"
+                    "默认重新开启 thinking（代理补 signature），--no-thinking 关闭；\n"
+                    "本会话固定清空 fallbackModel：重试仍失败就报错，绝不换模型。\n"
                     "例: patch-claude-code run --profile opencode-go -p \"say ok\"\n"
                     "    patch-claude-code run --profile opencode-go"
                 )
@@ -1428,15 +1698,15 @@ def main(argv=None) -> int:
                 retries = int(argv[i + 1]); i += 2; continue
             if a.startswith("--retries="):
                 retries = int(a.split("=", 1)[1]); i += 1; continue
-            if a == "--no-fallback":
-                no_fallback = True; i += 1; continue
+            if a == "--no-thinking":
+                no_thinking = True; i += 1; continue
             break
-        return cmd_run(argparse.Namespace(profile=profile, upstream=upstream, port=port, retries=retries, no_fallback=no_fallback, args=argv[i:]))
+        return cmd_run(argparse.Namespace(profile=profile, upstream=upstream, port=port, retries=retries, no_thinking=no_thinking, args=argv[i:]))
     parser = build_parser()
     # 兼容旧用法: patch-claude-code <profile>  ==  use <profile>
     known = {"list", "current", "backups", "use", "apply", "repair", "show", "unpatch",
              "verify", "models", "revert", "remove", "add", "presets", "setup", "link",
-             "proxy", "-h", "--help"}
+             "proxy", "daemon", "-h", "--help"}
     if argv and argv[0] not in known and argv[0] in profiles():
         argv = ["use", *argv]
     args = parser.parse_args(argv)

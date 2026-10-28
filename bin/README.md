@@ -75,7 +75,7 @@ patch-claude-code add opencode-go \
     --picker "deepseek-v4-pro:DeepSeek V4 Pro:$0.66/$1.98 per Mtok · 1M ctx" \
     --picker kimi-k3 \
     --picker glm-5.3 \
-    --fallback minimax-m3,qwen3.8-flash \
+    --no-thinking \
     --max-context 1000000 --verify --activate
 ```
 
@@ -88,10 +88,11 @@ Any other Anthropic-compatible gateway only changes these four:
 | `--opus/--sonnet/--haiku` | model ids that gateway really serves (`sonnet` is the default, `haiku` backs small internal calls) |
 | `--picker ID[:label[:description]]` | the `/model` rows, repeatable, in display order |
 
-`--fallback a,b` (or repeated, up to three) writes Claude Code's `fallbackModel`
-chain: when the primary returns a non-retryable error such as an upstream 400,
-Claude Code retries the same turn on the next model and returns to the primary
-at the start of the next user turn.
+`--no-thinking` sets `CLAUDE_CODE_DISABLE_THINKING=1`. DeepSeek's thinking mode
+requires every earlier assistant `thinking` block to be sent back; Claude Code
+drops unsigned blocks and then gets `400 ... thinking must be passed back`, so the
+DeepSeek presets disable thinking by default. `setup --thinking` / `add` without
+`--no-thinking` keeps it on if you want to experiment.
 
 `--discover` asks the gateway for its model list (`/v1/models`, then `/models`)
 and builds the `/model` rows from it — OpenCode answers 404 there, so it falls
@@ -111,17 +112,34 @@ patch-claude-code revert             # roll back to the newest backup
 patch-claude-code run --profile opencode-go   # start Claude Code behind the retry proxy
 ```
 
-## Retry proxy (OpenCode Go's opaque 400s)
+## One-time setup: plain `claude`
 
-OpenCode Go sometimes answers
+OpenCode Go omits `signature_delta` from thinking blocks. Claude Code then drops
+them, and DeepSeek rejects the next turn with `thinking must be passed back`
+(surfaced as `400 {"model":"deepseek-v4.1-flash"}` when Go hides the body).
+Install the signing + retry proxy once:
 
+```sh
+patch-claude-code daemon install --profile opencode-go
 ```
-400 {"model":"deepseek-v4.1-flash"}
-```
 
-with no error text — it drops the upstream body (`opencode#53243`, `#54996`). The
-same request usually succeeds on a retry, so `run` starts a local proxy for the
-lifetime of one Claude Code process and transparently retries:
+After that just run `claude` — no wrapper, no `--settings`:
+
+- `ANTHROPIC_BASE_URL` becomes `http://127.0.0.1:8790`
+- thinking is enabled; the proxy appends a `signature` before each thinking
+  `content_block_stop`, so the block survives the round trip
+- `fallbackModel` is removed: it never switches models
+- the LaunchAgent `~/Library/LaunchAgents/dev.patch-claude-code.proxy.plist`
+  starts it at login and `KeepAlive` restarts it if it dies
+- `patch-claude-code daemon status` / `daemon uninstall`; uninstall restores the
+  direct URL and turns thinking off, because direct mode cannot sign
+- attempts go to `~/.claude/proxy.log` (with `x-opencode-log-id`); daemon errors
+  to `~/.claude/proxy-daemon.err.log`
+
+## Temporary: `run`
+
+`run` is the same proxy without installing anything: it lives only as long as one
+Claude Code process and overrides the base URL with `--settings`.
 
 ```sh
 patch-claude-code run --profile opencode-go            # interactive TUI
@@ -132,10 +150,10 @@ patch-claude-code run --profile opencode-go -- --resume <id>
 - Only `400` whose body is exactly `{"model": ...}` (or empty), plus `408/429/5xx`, are retried.
 - The first retry keeps the same session id (prompt cache stays warm); later retries
   rotate `x-opencode-session` / `X-Claude-Code-Session-Id` to escape a bad route.
-- `ANTHROPIC_BASE_URL` is overridden per-process with `--settings` — `settings.json`
-  is not modified, no daemon, and the proxy dies with Claude Code.
-- `--no-fallback` clears `fallbackModel` for the session, so a request that still
-  fails after retries errors out instead of silently switching models.
+- `run` always clears `fallbackModel` for the session: a request that still fails
+  after retries errors out instead of silently switching models.
+- `run` re-enables thinking (`CLAUDE_CODE_DISABLE_THINKING=0`) and the proxy signs
+  the thinking blocks; `--no-thinking` turns it off for a faster session.
 - Attempts are logged to `~/.claude/proxy.log` with the gateway's
   `x-opencode-log-id`, which is what OpenCode support asks for.
 
@@ -153,12 +171,17 @@ Run the proxy alone (for another Anthropic client) with `patch-claude-code proxy
   configured. Add `--keep-builtin` to append them after the built-in
   Opus/Sonnet/Haiku rows instead.
 - A `402 Insufficient account funds` from a gateway is billing, not config.
-- OpenCode Go's Anthropic endpoint occasionally answers `400 {"model":"deepseek-v4.1-flash"}`
-  — the gateway drops the upstream error body, so the real cause is invisible. The
-  request often succeeds when retried. The `opencode-go` preset ships
-  `fallbackModel: ["minimax-m3", "qwen3.8-flash"]`, so Claude Code switches models
-  for that turn instead of failing. Use `patch-claude-code use deepseek` to avoid
-  that gateway entirely if it becomes frequent.
+- DeepSeek in thinking mode requires every earlier assistant `thinking` block to be
+  passed back. Claude Code drops blocks without a signature, which surfaces as
+  `400 {"model":"deepseek-v4.1-flash"}` on OpenCode Go (the gateway hides the
+  message) or as `The content[].thinking ... must be passed back` on DeepSeek direct.
+  Without the daemon, the `opencode-go` and `deepseek` presets set
+  `CLAUDE_CODE_DISABLE_THINKING=1` so direct `claude` stays usable (no extended
+  thinking). `daemon install` or `run` restores thinking and supplies the missing
+  signatures.
+- No automatic model fallback is configured. Switching a DeepSeek conversation to
+  another model leaves assistant turns without DeepSeek thinking, and switching
+  back then fails; it also costs more and pollutes the context.
 - OpenCode's free tier is gated server-side to the OpenCode client itself: from
   anywhere else it answers `403 FreeTierError`. There is deliberately no preset
   for it — it cannot work as a Claude Code gateway.
@@ -179,12 +202,22 @@ key 优先从 `~/.zshrc` 的变量读，只把变量名写进档案，不落地�
 `settings.json` 都先备份到 `~/.claude/backups/`，`unpatch` 可整体撤销。
 档案在 `~/.claude/profiles/`，不进仓库。
 
-OpenCode Go 的 `deepseek-v4.1-flash` 会偶发 `400 {"model":"deepseek-v4.1-flash"}`
-（网关吞掉上游错误正文，重试通常能过）。`opencode-go` 预设已配
-`fallbackModel: minimax-m3, qwen3.8-flash`，Claude Code 会在那一回合自动换模型；
-嫌频繁就 `patch-claude-code use deepseek` 直接走 DeepSeek 官方端点。
+DeepSeek 的 thinking 模式要求把之前的 assistant `thinking` 块原样回传；
+Claude Code 会丢掉没有 signature 的块，于是偶发
+`400 {"model":"deepseek-v4.1-flash"}`（Go 网关吞正文）或
+`The content[].thinking ... must be passed back`（DeepSeek 官方直连）。
 
-更推荐用带重试代理的方式启动，既保留 DeepSeek 又不用切模型：
+一次性配置（推荐，之后直接 `claude`）：
+
+```sh
+patch-claude-code daemon install --profile opencode-go
+```
+
+它把 `ANTHROPIC_BASE_URL` 指向本地 `127.0.0.1:8790`，并装一个 launchd 常驻服务：
+代理给缺失的 thinking 块补 signature、重试偶发 400、固定清空 `fallbackModel`。
+`daemon status` 查看，`daemon uninstall` 恢复直连（直连会重新关 thinking）。
+
+临时用（不装服务）：
 
 ```sh
 patch-claude-code run --profile opencode-go        # 交互 TUI
