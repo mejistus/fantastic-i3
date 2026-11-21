@@ -122,24 +122,73 @@ map("n", "<C-q>", function()
     vim.fn.termopen('easy ' .. current_file)
 end, { desc = "run source code" })
 
-map('n', '<leader>fy', function()
-    local width = vim.o.columns * 0.5
-    local height = vim.o.lines * 0.5
-    local word = vim.fn.expand("<cword>")
+local function get_visual_selection()
+    local mode = vim.fn.mode()
+    local stype = mode == 'V' and 'V' or (mode == '\22' and '\22' or 'v')
+    local lines = vim.fn.getregion(vim.fn.getpos('v'), vim.fn.getpos('.'), { type = stype })
+    return table.concat(lines, '\n')
+end
+
+local function open_fanyi(text)
+    text = vim.trim(text or '')
+    if text == '' then
+        vim.notify('fanyi: 没有选中的文本', vim.log.levels.WARN)
+        return
+    end
+
+    local width = math.max(40, math.min(vim.o.columns - 4, math.floor(vim.o.columns * 0.6)))
+    local height = math.max(10, math.min(vim.o.lines - 4, math.floor(vim.o.lines * 0.5)))
     local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
-    vim.api.nvim_buf_set_option(buf, 'bufhidden', 'wipe')
-    vim.api.nvim_open_win(buf, true, {
-        relative = 'cursor',
-        width = math.ceil(width),
-        height = math.ceil(height),
-        col = 0,
-        row = 1,
-        border = 'rounded'
+    local win = vim.api.nvim_open_win(buf, true, {
+        relative = 'editor',
+        style = 'minimal',
+        border = 'rounded',
+        width = width,
+        height = height,
+        row = math.floor((vim.o.lines - height) / 2),
+        col = math.floor((vim.o.columns - width) / 2),
     })
-    -- vim.fn.termopen('fanyi -S ' .. vim.fn.expand('<cword>'))
-    vim.fn.termopen('fanyi ' .. word)
-end, { desc = "fanyi selected word" })
+
+    local function close()
+        if vim.api.nvim_win_is_valid(win) then
+            vim.api.nvim_win_close(win, true)
+        end
+        if vim.api.nvim_buf_is_valid(buf) then
+            vim.api.nvim_buf_delete(buf, { force = true })
+        end
+    end
+
+    -- 列表形式不经过 shell，选中文本里的空格、引号、换行都不会被拆开
+    local ok, err = pcall(vim.fn.termopen, { 'fanyi', '--', text }, {
+        on_exit = function(_, code)
+            vim.schedule(function()
+                if not vim.api.nvim_buf_is_valid(buf) then
+                    return
+                end
+                -- 翻译结束后按 q / Esc 关闭浮窗
+                vim.keymap.set({ 'n', 't' }, 'q', close, { buffer = buf, nowait = true, silent = true })
+                vim.keymap.set({ 'n', 't' }, '<Esc>', close, { buffer = buf, nowait = true, silent = true })
+                if code ~= 0 and code ~= 130 then
+                    vim.notify('fanyi 退出，状态码 ' .. code, vim.log.levels.WARN)
+                end
+            end)
+        end,
+    })
+    if not ok then
+        close()
+        vim.notify('fanyi 启动失败: ' .. tostring(err), vim.log.levels.ERROR)
+        return
+    end
+    vim.cmd('startinsert')
+end
+
+map('n', '<leader>fy', function()
+    open_fanyi(vim.fn.expand('<cword>'))
+end, { desc = "fanyi word under cursor" })
+
+map('x', '<leader>fy', function()
+    open_fanyi(get_visual_selection())
+end, { desc = "fanyi visual selection" })
 
 map('n', '<leader>tp', function()
     local width = 80
